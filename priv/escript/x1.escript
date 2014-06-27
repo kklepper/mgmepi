@@ -12,7 +12,7 @@ run(3, Pid) ->
     end;
 run(2, Pid) ->
     L = [
-         394239,394240, 458778,458779, 459023,459024,
+         394239,394240, 458778,458779, 459023,459024
         ],
     F = fun (E) ->
                 io:format("server=~p, ", [E]),
@@ -53,7 +53,10 @@ run(1, Pid) ->
          {false, fun(E) -> mgmepi_protocol:get_configuration_from_node(E,V,1) end},
          {false, fun(E) -> run(2,E) end},
          {false, fun(E) -> run(3,E) end},
-         {false, fun(E) -> mgmepi_protocol:alloc_nodeid(E,201,<<"x1">>,1) end}
+         {false, fun(E) -> mgmepi_protocol:alloc_nodeid(E,201,<<"x1">>,1) end},
+         {false, fun(E) -> mgmepi_protocol:create_nodegroup(E,[2,5]) end},
+         {false, fun(E) -> mgmepi_protocol:drop_nodegroup(E,1) end},
+         {false, fun(E) -> mgmepi_protocol:get_version(E) end}
         ],
     [ io:format("~p~n", [timer:tc(F,[Pid])]) || {true,F} <- L ];
 run(0, app) ->

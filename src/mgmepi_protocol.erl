@@ -35,6 +35,7 @@
          match_event_category/1, get_event_category_string/1]).
 -export([get_configuration/2, get_configuration_from_node/3]).
 -export([alloc_nodeid/4]).
+-export([create_nodegroup/2, drop_nodegroup/2]).
 
 %% == "3.2.1. Log Event Functions"
 
@@ -667,9 +668,49 @@ alloc_nodeid(Pid, Node, Name, LogEvent)
 %%   ndb_mgm_purge_stale_sessions/2
 %%   ndb_mgm_report_event/3
 %%   ndb_mgm_get_db_parameter_info/3 << mgmapi_configuration.cpp
-%% == Functions: ? ==
-%%   ndb_mgm_create_nodegroup/4
-%%   ndb_mgm_drop_nodegroup/3
+
+%% == protected: "?" ==
+
+%% @see http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-online-add-node-example.html
+
+-spec create_nodegroup(pid(),[integer()]) -> {ok,integer()}|{error,_}.
+create_nodegroup(Pid, Nodes)
+  when is_pid(Pid), is_list(Nodes) ->
+    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_create_nodegroup/4
+    call(Pid,
+         <<"create nodegroup">>,
+         [
+          {<<"nodes">>, implode(fun integer_to_binary/1,Nodes)}
+         ],
+         [
+          {<<"create nodegroup reply">>, null, mandatory},
+          {<<"ng">>, integer, mandatory},
+          {<<"error_code">>, integer, optional},
+          {<<"result">>, string, mandatory}
+         ],
+         undefined,
+         fun(L) -> get_result(L, <<"ng">>) end).
+
+-spec drop_nodegroup(pid(),integer()) -> ok|{error,_}.
+drop_nodegroup(Pid, NodeGroup) ->
+    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_drop_nodegroup/3
+    %%
+    %% BUG: NO nodegroup -> <<"drop nodegroup reply\nresult: error: -1">>,  NO "\n"
+    %%                                                      ^
+    call(Pid,
+         <<"drop nodegroup">>,
+         [
+          {<<"ng">>, integer_to_binary(NodeGroup)}
+         ],
+         [
+          {<<"drop nodegroup reply">>, null, mandatory},
+          {<<"error_code">>, integer, optional}, % ?
+          {<<"result">>, string, mandatory},
+          {<<"error_code">>, integer, optional}  % !
+         ],
+         undefined,
+         fun(L) -> get_result(L) end).
+
 %% d ndb_mgm_filter_clusterlog/4 = ndb_mgm_set_clusterlog_severity_filter/4
 %% d ndb_mgm_get_logfilter/1 = ndb_mgm_get_clusterlog_severity_filter_old/1
 %% d ndb_mgm_set_loglevel_clusterlog/5 = ndb_mgm_set_clusterlog_loglevel/5
