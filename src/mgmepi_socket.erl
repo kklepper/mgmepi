@@ -19,13 +19,13 @@
 
 -include("internal.hrl").
 
-%% -- public --
+%% -- private --
 -export([connect/4, close/1]).
 -export([setopts/2, setopt_active/2]).
 -export([recv/2, recv/3, send/3]).
 -export([match/2, parse/3, parse/4]).
 
-%% -- private --
+%% -- internal --
 -record(handle, {
           socket :: port(), % gen_tcp:socket(), >> mgmepi_server.erl
           timeout = 3000 :: timeout(),
@@ -37,7 +37,7 @@
 
 -type(handle() :: #handle{}).
 
-%% == public ==
+%% == private ==
 
 -spec connect(inet:ip_address()|inet:hostname(),inet:port_number(),
               [gen_tcp:connect_option()],timeout()) -> {ok,handle()}|{error,_}.
@@ -99,9 +99,9 @@ parse(#handle{field_separator=P}=H, List, Binary) ->
 
 -spec parse(handle(),[argument()],binary(),binary:cp()) -> {[property()],[fragment()]}.
 parse(#handle{line_separator=P}, List, Binary, Pattern) ->
-    match(List, [ split(E,Pattern,[]) || E <- split(Binary,P,[global]) ], []).
+    match(List, [ binary:split(E,Pattern,[]) || E <- split(Binary,P) ], []).
 
-%% == private ==
+%% == internal ==
 
 match([], Rest, List) ->
     {lists:reverse(List), Rest};
@@ -127,11 +127,8 @@ recv(#handle{}=H, Binary, _Pattern, Parts) ->
     [R|L] = split(Binary, 0, Parts, []),
     {ok, list_to_binary(lists:reverse(L)), H#handle{buf = R}}.
 
-%% split(Subject, Pattern) ->
-%%     lists:reverse(split(Subject,0,binary:matches(Subject,Pattern),[])).
-
-split(Subject, Pattern, Options) ->
-    binary:split(Subject, Pattern, Options). % TODO
+split(Subject, Pattern) ->
+    lists:reverse(split(Subject,0,binary:matches(Subject,Pattern),[])).
 
 split(Subject, Start, [], List) ->
     [binary:part(Subject,Start,size(Subject)-Start)|List];

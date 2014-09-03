@@ -19,7 +19,7 @@
 
 -include("internal.hrl").
 
-%% -- public --
+%% -- private --
 -export([start_link/1, stop/1]).
 -export([call/2, cast/2]).
 
@@ -28,7 +28,7 @@
 -export([init/1, terminate/2, code_change/3,
          handle_call/3, handle_cast/2, handle_info/2]).
 
-%% -- private --
+%% -- internal --
 -record(state, {
           handle :: tuple(),         % mgmepi_socket::handle()
           from :: {pid(),term()},
@@ -39,7 +39,7 @@
 
 -define(SOCKET(Handle), element(2,Handle)). % !CAUTION!
 
-%% == public ==
+%% == private ==
 
 -spec start_link(proplists:proplist()) -> {ok,pid()}|{error,_}.
 start_link(Args)
@@ -103,7 +103,7 @@ handle_info({'EXIT',_Pid,Reason}, State) ->
 handle_info(_Info, State) ->
     {noreply, State}.
 
-%% == private ==
+%% == internal ==
 
 cleanup(#state{handle=H}=S)
   when undefined =/= H ->

@@ -19,10 +19,10 @@
 
 -include("internal.hrl").
 
-%% -- public --
+%% -- private --
 -export([parse/2]).
 
-%% == public == TODO, unsigned??
+%% == private == TODO, unsigned??
 
 -spec parse([property()],[fragment()]) -> [property()].
 parse(Header, Rest) ->

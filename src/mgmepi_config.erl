@@ -19,13 +19,13 @@
 
 -include("internal.hrl").
 
-%% -- public --
+%% -- private --
 -export([unpack/1, unpack/2, unpack/3]).
 -export([get_connection/3]).
 
 -export([config/2]). % TODO
 
-%% -- private --
+%% -- internal --
 
 %% -- storage/ndb/include/util/ConfigValues.hpp --
 
@@ -41,7 +41,7 @@
 -define(SECTION(I), (I band (16#00003FFF bsl 14))). % KP_SECTION_(MASK|SHIFT)
 -define(TYPE(I),    ((I bsr 28) band 16#0000000F)). % KP_TYPE_(MASK|SHIFT)
 
-%% == public ==
+%% == private ==
 
 %% @see storage/ndb/src/common/util/ConfigValues.cpp: ConfigValuesFactory::unpack/2
 
@@ -79,7 +79,7 @@ get_connection(List, Node, tcp)
         end,
     filter(List, ?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_TCP, F). % unzup?, TODO
 
-%% === private ===
+%% === internal ===
 
 checksum(Binary, Size, Digit) ->
     lists:foldl(fun(E,A) -> A bxor binary:decode_unsigned(E) end, Digit,

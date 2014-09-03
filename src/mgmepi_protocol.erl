@@ -19,7 +19,7 @@
 
 -include("internal.hrl").
 
-%% -- public --  @see http://dev.mysql.com/doc/ndbapi/en/mgm-functions.html
+%% -- private: http://dev.mysql.com/doc/ndbapi/en/mgm-functions.html --
 -export([listen_event/2]).
 -export([get_version/1, check_connection/1]).
 -export([get_status/1, get_status2/2, dump_state/3]).
@@ -29,7 +29,7 @@
 -export([start_backup/5,abort_backup/3]).
 -export([enter_single_user/2, exit_single_user/1]).
 
-%% -- protected --  @see storage/ndb/include/mgmapi/mgmapi.h:
+%% -- private: storage/ndb/include/mgmapi/mgmapi.h --
 -export([match_node_type/1, get_node_type_string/1, get_node_type_alias_string/1,
          match_node_status/1, get_node_status_string/1, get_event_severity_string/1,
          match_event_category/1, get_event_category_string/1]).
@@ -37,7 +37,9 @@
 -export([alloc_nodeid/4]).
 -export([create_nodegroup/2, drop_nodegroup/2]).
 
-%% == "3.2.1. Log Event Functions"
+%% == private: http://dev.mysql.com/doc/ndbapi/en/mgm-functions.html ==
+
+%% -- 3.2.1. Log Event Functions --
 
 listen_event(Pid, Filter) ->
     %% storage/ndb/src/mgmapi/mgmapi.cpp : ndb_mgm_listen_event/2, 3.2.1.1
@@ -81,19 +83,19 @@ listen_event(Pid, Filter) ->
 %%  6 ndb_logevent_get_latest_error/1
 %%  7 ndb_logevent_get_latest_error_msg/1
 
-%% == 3.2.2. MGM API Error Handling Functions ==
+%% -- 3.2.2. MGM API Error Handling Functions --
 %%  1 ndb_mgm_get_latest_error/1
 %%  2 ndb_mgm_get_latest_error_msg/1
 %%  3 ndb_mgm_get_latest_error_desc/1
 %%  4 ndb_mgm_set_error_stream/2
 
-%% == 3.2.3. Management Server Handle Functions ==
+%% -- 3.2.3. Management Server Handle Functions --
 %%  1 ndb_mgm_create_handle/1
 %%  2 ndb_mgm_set_name/2
 %%  3 ndb_mgm_set_ignore_sigpipe/2
 %%  4 ndb_mgm_destroy_handle/1
 
-%% == public: "3.2.4. Management Server Connection Functions" ==
+%% -- 3.2.4. Management Server Connection Functions --
 
 -spec get_version(pid()) -> {ok,integer()}|{error,_}.
 get_version(Pid)
@@ -143,7 +145,7 @@ check_connection(Pid)
 %% 13 ndb_mgm_connect/4
 %% 14 ndb_mgm_disconnect/1
 
-%% == public: "3.2.5. Cluster Status Functions"
+%% -- 3.2.5. Cluster Status Functions --
 
 -spec get_status(pid()) -> {ok,term()}|{error,_}. % TODO
 get_status(Pid)
@@ -187,7 +189,7 @@ dump_state(Pid, Node, Args)
          undefined,
          fun(L) -> get_result(L) end).
 
-%% == public: "3.2.6. Start/stop nodes" ==
+%% -- 3.2.6. Start/stop nodes --
 
 -spec start(pid(),integer()) -> {ok,integer()}|{error,_}.
 start(Pid, Version)
@@ -340,7 +342,7 @@ restart(Pid, Version, Abort, Initial, NoStart, Force, Nodes)
          undefined,
          fun (L) -> get_result(L, {<<"restarted">>,<<"disconnect">>}) end).
 
-%% == public: "3.2.7. Cluster Log Functions" ==
+%% -- 3.2.7. Cluster Log Functions --
 
 -spec get_clusterlog_severity_filter(pid()) -> {ok,[{integer(),integer()}]}|{error,_}.
 get_clusterlog_severity_filter(Pid)
@@ -422,7 +424,7 @@ set_clusterlog_loglevel(Pid, Node, Category, Level)
          undefined,
          fun (L) -> get_result(L) end).
 
-%% == 3.2.8. Backup Functions ==
+%% -- 3.2.8. Backup Functions --
 
 -spec start_backup(pid(),integer(),integer(),integer(),integer()) -> {ok,integer()}|{error,_}.
 start_backup(Pid, Version, Completed, BackupId, Backuppoint)
@@ -470,7 +472,7 @@ abort_backup(Pid, Version, BackupId)
          undefined,
          fun (L) -> get_result(L) end).
 
-%% == public: "3.2.9. Single-User Mode Functions" ==
+%% -- 3.2.9. Single-User Mode Functions --
 
 -spec enter_single_user(pid(),integer()) -> ok|{error,_}.
 enter_single_user(Pid, Node)
@@ -502,13 +504,15 @@ exit_single_user(Pid)
          undefined,
          fun (L) -> get_result(L) end).
 
-%% == protected: "Connect/Disconnect Management Server" ==
+%% == private: storage/ndb/include/mgmapi/mgmapi.h ==
+
+%% -- "Connect/Disconnect Management Server" --
 %%   ndb_mgm_get_connected_bind_address/1
 
-%% == protectd: "Listening to log events" ==
+%% -- "Listening to log events" --
 %%   ndb_mgm_set_loglevel_node/5
 
-%% == protected: "Used to convert between different data formats" ==
+%% -- "Used to convert between different data formats" --
 
 -spec match_node_type(binary()) -> integer().
 match_node_type(NodeType)
@@ -567,7 +571,7 @@ get_event_category_string(Category)
     %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_event_category_string/1
     get_value(Category, 1, event_category(), 2, <<"">>).
 
-%% == protected: "Configuration handling" ==
+%% -- "Configuration handling" --
 
 -spec get_configuration(pid(),integer()) -> {ok,term()}|{error,_}. % TODO
 get_configuration(Pid, Version)
@@ -669,7 +673,7 @@ alloc_nodeid(Pid, Node, Name, LogEvent)
 %%   ndb_mgm_report_event/3
 %%   ndb_mgm_get_db_parameter_info/3 << mgmapi_configuration.cpp
 
-%% == protected: "?" ==
+%% -- "?" --
 
 %% @see http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-online-add-node-example.html
 
@@ -715,7 +719,7 @@ drop_nodegroup(Pid, NodeGroup) ->
 %% d ndb_mgm_get_logfilter/1 = ndb_mgm_get_clusterlog_severity_filter_old/1
 %% d ndb_mgm_set_loglevel_clusterlog/5 = ndb_mgm_set_clusterlog_loglevel/5
 %% d ndb_mgm_get_loglevel_clusterlog/1 = ndb_mgm_get_clusterlog_loglevel_old/1
-%% == Functions: ? ==
+
 %%   ndb_mgm_dump_events/4
 
 %%   ndb_mgm_call/5, cmd_bulk? TODO
@@ -754,7 +758,7 @@ drop_nodegroup(Pid, NodeGroup) ->
 %%   _ndb_mgm_get_socket/1
 %%   ndb_mgm_get_configuration2/4
 
-%% == private ==
+%% == internal ==
 
 active(Pid, Pattern, Callback) ->
     active(Pid, Pattern, Callback, make_ref()).
