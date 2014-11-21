@@ -25,6 +25,7 @@ run(2, Pid) ->
 run(1, Pid) ->
     V = 459525,
     L = [
+         {true,  fun(E) -> mgmepi_protocol:alloc_nodeid(E,201,<<"x1">>,1) end},
          {true,  fun(E) -> mgmepi_protocol:get_version(E) end},
          {false, fun(E) -> mgmepi_protocol:check_connection(E) end},
          {false, fun(E) -> mgmepi_protocol:get_status(E) end},
@@ -53,10 +54,9 @@ run(1, Pid) ->
          {false, fun(E) -> mgmepi_protocol:get_configuration_from_node(E,V,1) end},
          {false, fun(E) -> run(2,E) end},
          {false, fun(E) -> run(3,E) end},
-         {false, fun(E) -> mgmepi_protocol:alloc_nodeid(E,201,<<"x1">>,1) end},
          {false, fun(E) -> mgmepi_protocol:create_nodegroup(E,[2,5]) end},
          {false, fun(E) -> mgmepi_protocol:drop_nodegroup(E,1) end},
-         {false, fun(E) -> mgmepi_protocol:get_version(E) end}
+         {true,  fun(E) -> mgmepi_protocol:end_session(E) end}
         ],
     [ io:format("~p~n", [timer:tc(F,[Pid])]) || {true,F} <- L ];
 run(0, app) ->

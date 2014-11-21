@@ -150,6 +150,7 @@ ready(_Request, _From, State) ->
 
 
 accepted(Binary, #state{handle=H,pattern=P,callback=C}=S) ->
+    %%io:format("accepted=~p~n", [Binary]),
     case mgmepi_socket:setopt_active(H, false) andalso mgmepi_socket:recv(H, Binary, P) of
         {ok, Packet, Handle} ->
             received(Packet, S#state{handle = Handle}, C);
@@ -158,6 +159,7 @@ accepted(Binary, #state{handle=H,pattern=P,callback=C}=S) ->
     end.
 
 received(Binary, #state{params=P}=S, undefined) ->
+    %%io:format("received=~p~n", [Binary]),
     received(Binary, S, fun(H,B) -> {L,_} = mgmepi_socket:parse(H,P,B), {ok,L,H} end);
 received(Binary, #state{handle=H,from=F}=S, Callback) ->
     %%io:format("received=~p~n", [Binary]),

@@ -22,6 +22,7 @@
 %% -- public --
 -export([start/0, start/1, stop/0, version/0]).
 -export([get_config/0, get_config/1]).
+-export([alloc_nodeid/3]).
 
 %% == public ==
 
@@ -59,3 +60,11 @@ get_config(Pool) ->
             ok = poolboy:checkin(Pool, Pid),
             Result
     end.
+
+
+alloc_nodeid(Node, Name, LogEvent) ->
+    alloc_nodeid(mgmepi_pool, Node, Name, LogEvent).
+
+alloc_nodeid(Pool, Node, Name, LogEvent) ->
+    F = fun(Pid) -> mgmepi_protocol:alloc_nodeid(Pid,Node,Name,LogEvent) end,
+    poolboy:transaction(Pool, F).

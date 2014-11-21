@@ -37,7 +37,7 @@
                                                            3000
                                                           ]
                                                          ]},
-                                   permanent, 5000, worker, [poolboy]}
+                                   permanent, 5000, worker, [poolboy,mgmepi]}
                                  ]
                                }
                               ]}

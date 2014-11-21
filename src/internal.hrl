@@ -12,9 +12,9 @@
 
 %% enum ndb_mgm_node_type
 -define(NDB_MGM_NODE_TYPE_UNKNOWN, -1).
--define(NDB_MGM_NODE_TYPE_API,      0).
--define(NDB_MGM_NODE_TYPE_NDB,      1).
--define(NDB_MGM_NODE_TYPE_MGM,      2).
+-define(NDB_MGM_NODE_TYPE_API,      1). % NODE_TYPE_API
+-define(NDB_MGM_NODE_TYPE_NDB,      0). % NODE_TYPE_DB
+-define(NDB_MGM_NODE_TYPE_MGM,      2). % NODE_TYPE_MGM
 -define(NDB_MGM_NODE_TYPE_MIN,      0).
 -define(NDB_MGM_NODE_TYPE_MAX,      3).
 

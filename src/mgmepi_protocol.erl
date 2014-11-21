@@ -34,8 +34,10 @@
          match_node_status/1, get_node_status_string/1, get_event_severity_string/1,
          match_event_category/1, get_event_category_string/1]).
 -export([get_configuration/2, get_configuration_from_node/3]).
--export([alloc_nodeid/4]).
+-export([alloc_nodeid/4, end_session/1]).
 -export([create_nodegroup/2, drop_nodegroup/2]).
+
+%% -- private: storage/ndb/include/mgmapi/mgmapi_debug.h
 
 %% == private: http://dev.mysql.com/doc/ndbapi/en/mgm-functions.html ==
 
@@ -638,7 +640,7 @@ alloc_nodeid(Pid, Node, Name, LogEvent)
          <<"get nodeid">>,
          [
           {<<"version">>, integer_to_binary(?API_VERSION)},
-          {<<"nodetype">>, integer_to_binary(?NODE_TYPE_API)}, % != NDB_MGM_NODE_TYPE_API
+          {<<"nodetype">>, integer_to_binary(?NDB_MGM_NODE_TYPE_API)},
           {<<"nodeid">>, integer_to_binary(Node)},
           {<<"user">>, <<"mysqld">>},
           {<<"password">>, <<"mysqld">>},
@@ -656,8 +658,24 @@ alloc_nodeid(Pid, Node, Name, LogEvent)
          undefined,
          fun(L) -> get_result(L, <<"nodeid">>) end).
 
+-spec end_session(pid()) -> ok|{error,_}.
+end_session(Pid)
+  when is_pid(Pid) ->
+    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_end_session/1
+    %%
+    %% @see storage/ndb/src/mgmsrv/Services.cpp: MgmApiSession::endSession/2
+    %%      end_of_protocol (\n) NOTEXIST !, TODO
+    %%
+    %% call(Pid,
+    %%      <<"end session">>,
+    %%      [],
+    %%      [
+    %%       {<<"end session reply">>, null, mandatory}
+    %%      ],
+    %%      undefined).
+    false.
+
 %%   ndb_mgm_destroy_configuration/1
-%%   ndb_mgm_end_session/1
 %%   ndb_mgm_get_fd/1
 %%   ndb_mgm_get_mgmd_nodeid/1
 %%   ndb_mgm_create_configuration_iterator/2 << mgmapi_configuration.cpp
@@ -733,7 +751,8 @@ drop_nodegroup(Pid, NodeGroup) ->
 %%   free_log_handle/1
 %%   set_dynamic_ports_batched/4
 
-%% @see storage/ndb/include/mgmapi/mgmapi_debug.h
+%% == private: storage/ndb/include/mgmapi/mgmapi_debug.h ==
+
 %%   ndb_mgm_start_signallog/3
 %%   ndb_mgm_stop_signallog/3
 %%   ndb_mgm_log_signals/5
@@ -748,7 +767,8 @@ drop_nodegroup(Pid, NodeGroup) ->
 
 %% ? ndb_mgm_insert_error_impl/5
 
-%% @see storage/ndb/src/mgmapi/mgmapi_intarnal.h
+%% == private: storage/ndb/include/mgmapi/mgmapi_internal.h ==
+
 %%   ndb_mgm_set_connection_int_parameter/6
 %%   ndb_mgm_set_dynamic_ports/4
 %%   ndb_mgm_get_connection_int_parameter/6
