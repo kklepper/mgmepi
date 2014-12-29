@@ -1,5 +1,5 @@
 %% =============================================================================
-%% Copyright 2013-2014 AONO Tomohiko
+%% Copyright 2013-2015 AONO Tomohiko
 %%
 %% This library is free software; you can redistribute it and/or
 %% modify it under the terms of the GNU Lesser General Public
@@ -23,6 +23,8 @@
 -export([start/0, start/1, stop/0, version/0]).
 -export([get_config/0, get_config/1]).
 -export([alloc_nodeid/3]).
+
+-define(TIMEOUT, 3000).
 
 %% == public ==
 
@@ -50,9 +52,9 @@ get_config() ->
 get_config(Pool) ->
     case poolboy:checkout(Pool) of
         Pid ->
-            Result = case mgmepi_protocol:get_version(Pid) of
+            Result = case mgmepi_protocol:get_version(Pid, ?TIMEOUT) of
                          {ok, Version} ->
-                             case mgmepi_protocol:get_configuration(Pid, Version) of
+                             case mgmepi_protocol:get_configuration(Pid, Version, ?TIMEOUT) of
                                  {ok, Config} ->
                                      mgmepi_config:get_connection(Config, 201, tcp)
                              end
@@ -63,8 +65,8 @@ get_config(Pool) ->
 
 
 alloc_nodeid(Node, Name, LogEvent) ->
-    alloc_nodeid(mgmepi_pool, Node, Name, LogEvent).
+    alloc_nodeid(mgmepi_pool, Node, Name, LogEvent, ?TIMEOUT).
 
-alloc_nodeid(Pool, Node, Name, LogEvent) ->
-    F = fun(Pid) -> mgmepi_protocol:alloc_nodeid(Pid,Node,Name,LogEvent) end,
+alloc_nodeid(Pool, Node, Name, LogEvent, Timeout) ->
+    F = fun(Pid) -> mgmepi_protocol:alloc_nodeid(Pid,Node,Name,LogEvent, Timeout) end,
     poolboy:transaction(Pool, F).

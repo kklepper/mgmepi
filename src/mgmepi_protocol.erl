@@ -1,5 +1,5 @@
 %% =============================================================================
-%% Copyright 2013-2014 AONO Tomohiko
+%% Copyright 2013-2015 AONO Tomohiko
 %%
 %% This library is free software; you can redistribute it and/or
 %% modify it under the terms of the GNU Lesser General Public
@@ -20,70 +20,82 @@
 -include("internal.hrl").
 
 %% -- private: http://dev.mysql.com/doc/ndbapi/en/mgm-functions.html --
--export([listen_event/2]).
--export([get_version/1, check_connection/1]).
--export([get_status/1, get_status2/2, dump_state/3]).
--export([start/2, start/3, stop/3, stop/4, stop/5, restart/5, restart/7]).
--export([get_clusterlog_severity_filter/1, set_clusterlog_severity_filter/3,
-         get_clusterlog_loglevel/1, set_clusterlog_loglevel/4]).
--export([start_backup/5,abort_backup/3]).
--export([enter_single_user/2, exit_single_user/1]).
+-export([listen_event/3, get_event/1]).
+-export([get_version/2, check_connection/2]).
+-export([get_status/2, get_status2/3, dump_state/4]).
+-export([start/3, start/4, stop/4, stop/5, stop/6, restart/6, restart/8]).
+-export([get_clusterlog_severity_filter/2, set_clusterlog_severity_filter/4,
+         get_clusterlog_loglevel/2, set_clusterlog_loglevel/5]).
+-export([start_backup/6,abort_backup/4]).
+-export([enter_single_user/3, exit_single_user/2]).
 
-%% -- private: storage/ndb/include/mgmapi/mgmapi.h --
+%% -- private: ~/include/mgmapi/mgmapi.h --
 -export([match_node_type/1, get_node_type_string/1, get_node_type_alias_string/1,
          match_node_status/1, get_node_status_string/1, get_event_severity_string/1,
          match_event_category/1, get_event_category_string/1]).
--export([get_configuration/2, get_configuration_from_node/3]).
--export([alloc_nodeid/4, end_session/1]).
--export([create_nodegroup/2, drop_nodegroup/2]).
-
-%% -- private: storage/ndb/include/mgmapi/mgmapi_debug.h
+-export([get_configuration/3, get_configuration_from_node/4]).
+-export([alloc_nodeid/5, end_session/2]).
+-export([create_nodegroup/3, drop_nodegroup/3]).
 
 %% == private: http://dev.mysql.com/doc/ndbapi/en/mgm-functions.html ==
 
 %% -- 3.2.1. Log Event Functions --
 
-listen_event(Pid, Filter) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp : ndb_mgm_listen_event/2, 3.2.1.1
+-spec listen_event(pid(),[{integer(),integer()}],timeout()) -> {ok,reference()}|{error,_}.
+listen_event(Pid, Filter, Timeout)
+  when is_pid(Pid), is_list(Filter) ->
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp : ndb_mgm_listen_event/2, 3.2.1.1
+    %%
+    F = fun({C,L}) -> implode(fun integer_to_list/1,[C,L],<<"=">>) end,
     case call(Pid,
               <<"listen event">>,
               [
                {<<"parsable">>, <<"1">>},
-               {<<"filter">>, implode(fun(E) -> E end, Filter, <<"">>)}
+               {<<"filter">>, implode(F,Filter,<<" ">>)}
               ],
               [
                {<<"listen event">>, null, mandatory},
                {<<"result">>, integer, mandatory},
                {<<"msg">>, string, optional}
               ],
-              undefined,
-              fun (L) -> get_result(L,<<"msg">>) end) of
-        {ok, _} ->
-            %% storage/ndb/src/mgmapi/ndb_logevent.cpp: ndb_logevent_get_next/3, 3.2.1.5
-            L = [
-                 {<<"log event reply">>, null, mandatory},
-                 {<<"type">>, integer, mandatory},
-                 {<<"time">>, integer, mandatory},
-                 {<<"source_nodeid">>, integer, mandatory}
-                ],
-            P = binary:compile_pattern(<<"=">>),
-            active(Pid,
-                   binary:compile_pattern([<<"<PING>",?LS>>,<<?LS,?LS>>]),
-                   fun (Handle, <<>>) ->
-                           {continue, ignore, Handle};
-                       (Handle, Binary) ->
-                           {Header, Rest} = mgmepi_socket:parse(Handle, L, Binary, P),
-                           {continue, mgmepi_event:parse(Header,Rest), Handle}
-                   end);
+              fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"msg">>) end,
+              Timeout) of
+        ok ->
+            call(Pid, {active,[<<"<PING>",?LS>>,<<?LS,?LS>>]});
         {error, Reason} ->
             {error, Reason}
+    end.
+
+%% unlisten_event -> STOP!
+
+-spec get_event(binary()) -> [{binary(),term()}].
+get_event(Binary)
+  when is_binary(Binary) ->
+    %%
+    %% @see
+    %%  ~/src/mgmapi/ndb_logevent.cpp: ndb_logevent_get_next2/3, 3.2.1.6
+    %%
+    {H, R} = parse(Binary,
+                   [
+                    {<<"log event reply">>, null, mandatory},
+                    {<<"type">>, integer, mandatory},
+                    {<<"time">>, integer, mandatory},
+                    {<<"source_nodeid">>, integer, mandatory}
+                   ],
+                   <<"=">>),
+    case match(mgmepi_event:params(get_value(<<"type">>,H)), R, H) of
+        {L, []} ->
+            L
     end.
 
 %%  2 ndb_mgm_create_logevent_handle/2
 %%  3 ndb_mgm_destroy_logevent_handle/1
 %%  4 ndb_logevent_get_fd/1
-%%  6 ndb_logevent_get_latest_error/1
-%%  7 ndb_logevent_get_latest_error_msg/1
+%%  5 ndb_logevent_get_next/3
+%%  7 ndb_logevent_get_latest_error/1
+%%  8 ndb_logevent_get_latest_error_msg/1
 
 %% -- 3.2.2. MGM API Error Handling Functions --
 %%  1 ndb_mgm_get_latest_error/1
@@ -99,10 +111,13 @@ listen_event(Pid, Filter) ->
 
 %% -- 3.2.4. Management Server Connection Functions --
 
--spec get_version(pid()) -> {ok,integer()}|{error,_}.
-get_version(Pid)
+-spec get_version(pid(),timeout()) -> {ok,integer()}|{error,_}.
+get_version(Pid, Timeout)
   when is_pid(Pid) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_version/6, 3.2.4.5
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_version/6, 3.2.4.5
+    %%
     call(Pid,
          <<"get version">>,
          [],
@@ -117,13 +132,16 @@ get_version(Pid)
           {<<"mysql_minor">>, integer, optional},
           {<<"mysql_build">>, integer, optional}
          ],
-         undefined,
-         fun(L) -> get_value(<<"id">>,L) end).
+         fun(B,P) -> {L,[]} = parse(B,P), io:format("~p~n",[L]),{ok,get_value(<<"id">>,L)} end,
+         Timeout).
 
--spec check_connection(pid()) -> ok|{error,_}.
-check_connection(Pid)
+-spec check_connection(pid(),timeout()) -> ok|{error,_}.
+check_connection(Pid, Timeout)
   when is_pid(Pid) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_check_connection/1, 3.2.4.7
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_check_connection/1, 3.2.4.7
+    %%
     call(Pid,
          <<"check connection">>,
          [],
@@ -131,8 +149,8 @@ check_connection(Pid)
           {<<"check connection reply">>, null, mandatory},
           {<<"result">>, string, mandatory}
          ],
-         undefined,
-         fun(L) -> get_result(L) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
+         Timeout).
 
 %%  1 ndb_mgm_get_connectstring/3
 %%  2 ndb_mgm_get_configuration_nodeid/1
@@ -149,75 +167,90 @@ check_connection(Pid)
 
 %% -- 3.2.5. Cluster Status Functions --
 
--spec get_status(pid()) -> {ok,term()}|{error,_}. % TODO
-get_status(Pid)
+-spec get_status(pid(),timeout()) -> {ok,[term()]}|{error,_}.
+get_status(Pid, Timeout)
   when is_pid(Pid) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_status/1, 3.2.5.1
-    get_status2(Pid, []).
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_status/1, 3.2.5.1
+    %%
+    get_status2(Pid, [], Timeout).
 
--spec get_status2(pid(),[integer()]) -> {ok,term()}|{error,_}. % TODO
-get_status2(Pid, Types)
+-spec get_status2(pid(),[integer()],timeout()) -> {ok,[term()]}|{error,_}.
+get_status2(Pid, Types, Timeout)
   when is_pid(Pid), is_list(Types) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_status2/2, 3.2.5.2
-    L = [
-         {<<"node status">>, null, mandatory}
-        ],
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_status2/2, 3.2.5.2
+    %%
     call(Pid,
          <<"get status">>,
-         fold([
-               fun () when 0 < length(Types) ->
-                       {<<"types">>, implode(fun get_node_type_string/1,Types)};
-                   () ->
-                       undefined
-               end
-              ], []),
-         [],
-         fun(H,B) -> {[],R} = mgmepi_socket:parse(H,L,B), {ok,R,H} end). % TODO
+         if 0 < length(Types) ->
+                 [
+                  {<<"types">>, implode(fun get_node_type_string/1,Types,<<" ">>)}
+                 ];
+            true ->
+                 []
+         end,
+         [
+          {<<"node status">>, null, mandatory}
+         ],
+         fun(B,P) -> {[],R} = parse(B,P), {ok,R} end, % TODO
+         Timeout).
 
--spec dump_state(pid(),integer(),[integer()]) -> ok|{error,_}.
-dump_state(Pid, Node, Args)
+-spec dump_state(pid(),integer(),[integer()],timeout()) -> ok|{error,_}.
+dump_state(Pid, Node, Args, Timeout)
   when is_pid(Pid), ?IS_NODE(Node), is_list(Args) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_dump_state/5, 3.2.5.3
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_dump_state/5, 3.2.5.3
+    %%
     call(Pid,
-         <<"dump state">>, % size(Packet) < 256?, TODO
+         <<"dump state">>, % size(Packet) < 256?
          [
           {<<"node">>, integer_to_binary(Node)},
-          {<<"args">>, implode(fun integer_to_binary/1,Args)}
+          {<<"args">>, implode(fun integer_to_binary/1,Args,<<" ">>)}
          ],
          [
           {<<"dump state reply">>, null, mandatory},
           {<<"result">>, string, mandatory}
          ],
-         undefined,
-         fun(L) -> get_result(L) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
+         Timeout).
 
-%% -- 3.2.6. Start/stop nodes --
+%% -- 3.2.6. Functions for Starting & Stopping Nodes --
 
--spec start(pid(),integer()) -> {ok,integer()}|{error,_}.
-start(Pid, Version)
+-spec start(pid(),integer(),timeout()) -> {ok,integer()}|{error,_}.
+start(Pid, Version, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_start/3, 3.2.6.1 (1/2)
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_start/3, 3.2.6.1 (1/2)
+    %%
     call(Pid,
          <<"start all">>,
          [],
          [
           {<<"start reply">>, null, mandatory},
-          {<<"started">>, integer, optional},  % ? << mgmapi.cpp
+          {<<"started">>, integer, optional},   % ?
           {<<"result">>, string, mandatory},
-          {<<"started">>, integer, optional}   % !
+          {<<"started">>, integer, optional}    % !
          ],
-         undefined,
-         fun (L) -> get_result(L,<<"started">>) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"started">>) end,
+         Timeout).
 
--spec start(pid(),integer(),[integer()]) -> {ok,integer()}|{error,_}.
-start(Pid, Version, Nodes)
+-spec start(pid(),integer(),[integer()],timeout()) -> {ok,integer()}|{error,_}.
+start(Pid, Version, Nodes, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), is_list(Nodes) ->
-    start(Pid, Version, Nodes, 0).
+    start(Pid, Version, Nodes, Timeout, 0).
 
-start(_Pid, _Version, [], Started) ->
+start(_Pid, _Version, [], _Timeout, Started) ->
     {ok, Started};
-start(Pid, Version, [H|T], Started) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_start/3, 3.2.6.1 (2/2)
+start(Pid, Version, [H|T], Timeout, Started) ->
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_start/3, 3.2.6.1 (2/2)
+    %%
     case call(Pid,
               <<"start">>,
               [
@@ -227,23 +260,26 @@ start(Pid, Version, [H|T], Started) ->
                {<<"start reply">>, null, mandatory},
                {<<"result">>, string, mandatory}
               ],
-              undefined,
-              fun (L) -> get_result(L) end) of
+              fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
+              Timeout) of
         ok ->
-            start(Pid, Version, T, Started + 1);
+            start(Pid, Version, T, Timeout, Started+1);
         {error, Reason} ->
             {error, Reason}
     end.
 
--spec stop(pid(),integer(),integer()) -> {ok,{integer(),integer()}}|{error,_}.
-stop(Pid, Version, Abort)
+-spec stop(pid(),integer(),integer(),timeout()) -> {ok,{integer(),integer()}}|{error,_}.
+stop(Pid, Version, Abort, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), ?IS_BOOLEAN(Abort) ->
-    stop(Pid, Version, Abort, [?NDB_MGM_NODE_TYPE_NDB]).
+    stop(Pid, Version, Abort, [?NDB_MGM_NODE_TYPE_NDB], Timeout).
 
--spec stop(pid(),integer(),integer(),[integer()]) -> {ok,{integer(),integer()}}|{error,_}.
-stop(Pid, Version, Abort, Types)
+-spec stop(pid(),integer(),integer(),[integer()],timeout()) -> {ok,{integer(),integer()}}|{error,_}.
+stop(Pid, Version, Abort, Types, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), ?IS_BOOLEAN(Abort), is_list(Types) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_stop4/6, 3.2.6.[6-9] (!=, 1/2)
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_stop4/6, 3.2.6.[6-9] (!=, 1/2)
+    %%
     F = fun (?NDB_MGM_NODE_TYPE_NDB) -> <<"db">>; % != ndb
             (?NDB_MGM_NODE_TYPE_MGM) -> <<"mgm">>
         end,
@@ -255,20 +291,22 @@ stop(Pid, Version, Abort, Types)
          ],
          [
           {<<"stop reply">>, null, mandatory},
-          {<<"stopped">>, integer, optional},    % ? << mgmapi.cpp
+          {<<"stopped">>, integer, optional},     % ?
           {<<"result">>, string, mandatory},
-          {<<"stopped">>, integer, optional},    % !
+          {<<"stopped">>, integer, optional},     % !
           {<<"disconnect">>, integer, mandatory}
          ],
-         undefined,
-         fun (L) -> get_result(L, {<<"stopped">>,<<"disconnect">>}) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L,[<<"stopped">>,<<"disconnect">>]) end,
+         Timeout).
 
--spec stop(pid(),integer(),integer(),integer(),[integer()])
-          -> {ok,{integer(),integer()}}|{error,_}.
-stop(Pid, Version, Abort, Force, Nodes)
+-spec stop(pid(),integer(),integer(),integer(),[integer()],timeout()) -> {ok,{integer(),integer()}}|{error,_}.
+stop(Pid, Version, Abort, Force, Nodes, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version),
        ?IS_BOOLEAN(Abort), ?IS_BOOLEAN(Force), is_list(Nodes) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_stop4/6, 3.2.6.[6-9] (2/2)
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_stop4/6, 3.2.6.[6-9] (2/2)
+    %%
     call(Pid,
          <<"stop v2">>,
          fold([
@@ -280,24 +318,27 @@ stop(Pid, Version, Abort, Force, Nodes)
                end
               ],
               [
-               {<<"node">>, implode(fun integer_to_binary/1,Nodes)},
+               {<<"node">>, implode(fun integer_to_binary/1,Nodes,<<" ">>)},
                {<<"abort">>, integer_to_binary(Abort)}
               ]),
          [
           {<<"stop reply">>, null, mandatory},
-          {<<"stopped">>, integer, optional},    % ? << mgmapi.cpp
+          {<<"stopped">>, integer, optional},     % ?
           {<<"result">>, string, mandatory},
-          {<<"stopped">>, integer, optional},    % !
+          {<<"stopped">>, integer, optional},     % !
           {<<"disconnect">>, integer, mandatory}
          ],
-         undefined,
-         fun (L) -> get_result(L, {<<"stopped">>,<<"disconnect">>}) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L,[<<"stopped">>,<<"disconnect">>]) end,
+         Timeout).
 
--spec restart(pid(),integer(),integer(),integer(),integer()) -> {ok,integer()}|{error,_}.
-restart(Pid, Version, Abort, Initial, NoStart)
+-spec restart(pid(),integer(),integer(),integer(),integer(),timeout()) -> {ok,integer()}|{error,_}.
+restart(Pid, Version, Abort, Initial, NoStart, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), ?IS_BOOLEAN(Abort),
        ?IS_BOOLEAN(Initial), ?IS_BOOLEAN(NoStart) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_restart4/8, 3.2.6.[2-5] (!=, 1/2)
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_restart4/8, 3.2.6.[2-5] (!=, 1/2)
+    %%
     call(Pid,
          <<"restart all">>, % v1
          [
@@ -310,15 +351,18 @@ restart(Pid, Version, Abort, Initial, NoStart)
           {<<"result">>, string, mandatory},
           {<<"restarted">>, integer, optional}
          ],
-         undefined,
-         fun (L) -> get_result(L, <<"restarted">>) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"restarted">>) end,
+         Timeout).
 
--spec restart(pid(),integer(),integer(),integer(),integer(),integer(),[integer()])
+-spec restart(pid(),integer(),integer(),integer(),integer(),integer(),[integer()],timeout())
              -> {ok,{integer(),integer()}}|{error,_}.
-restart(Pid, Version, Abort, Initial, NoStart, Force, Nodes)
+restart(Pid, Version, Abort, Initial, NoStart, Force, Nodes, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), ?IS_BOOLEAN(Abort),
        ?IS_BOOLEAN(Initial), ?IS_BOOLEAN(NoStart), ?IS_BOOLEAN(Force), is_list(Nodes) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_restart4/8, 3.2.6.[2-5] (2/2)
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_restart4/8, 3.2.6.[2-5] (2/2)
+    %%
     call(Pid,
          <<"restart node v2">>,
          fold([
@@ -330,7 +374,7 @@ restart(Pid, Version, Abort, Initial, NoStart, Force, Nodes)
                end
               ],
               [
-               {<<"node">>, implode(fun integer_to_binary/1,Nodes)},
+               {<<"node">>, implode(fun integer_to_binary/1,Nodes,<<" ">>)},
                {<<"abort">>, integer_to_binary(Abort)},
                {<<"initialstart">>, integer_to_binary(Initial)},
                {<<"nostart">>, integer_to_binary(NoStart)}
@@ -341,15 +385,18 @@ restart(Pid, Version, Abort, Initial, NoStart, Force, Nodes)
           {<<"restarted">>, integer, optional},
           {<<"disconnect">>, integer, optional}
          ],
-         undefined,
-         fun (L) -> get_result(L, {<<"restarted">>,<<"disconnect">>}) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L,[<<"restarted">>,<<"disconnect">>]) end,
+         Timeout).
 
 %% -- 3.2.7. Cluster Log Functions --
 
--spec get_clusterlog_severity_filter(pid()) -> {ok,[{integer(),integer()}]}|{error,_}.
-get_clusterlog_severity_filter(Pid)
+-spec get_clusterlog_severity_filter(pid(),timeout()) -> {ok,[{integer(),integer()}]}|{error,_}.
+get_clusterlog_severity_filter(Pid, Timeout)
   when is_pid(Pid) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_clusterlog_severity_filter/3, 3.2.7.1
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_clusterlog_severity_filter/3, 3.2.7.1
+    %%
     call(Pid,
          <<"get info clusterlog">>,
          [],
@@ -363,13 +410,16 @@ get_clusterlog_severity_filter(Pid)
           {<<"critical">>, integer, mandatory},
           {<<"alert">>, integer, mandatory}
          ],
-         undefined,
-         fun(L) -> lists:keymap(fun match_event_severity/1,1,L) end).
+         fun(B,P) -> {L,[]} = parse(B,P), lists:keymap(fun match_event_severity/1,1,L) end,
+         Timeout).
 
--spec set_clusterlog_severity_filter(pid(),integer(),integer()) -> {ok,integer()}|{error,_}.
-set_clusterlog_severity_filter(Pid, Severity, Enable)
+-spec set_clusterlog_severity_filter(pid(),integer(),integer(),timeout()) -> {ok,integer()}|{error,_}.
+set_clusterlog_severity_filter(Pid, Severity, Enable, Timeout)
   when is_pid(Pid), ?IS_EVENT_SEVERITY(Severity), ?IS_BOOLEAN(Enable) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_set_clusterlog_severity_filter/4, 3.2.7.2
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_set_clusterlog_severity_filter/4, 3.2.7.2
+    %%
     call(Pid,
          <<"set logfilter">>,
          [
@@ -380,13 +430,16 @@ set_clusterlog_severity_filter(Pid, Severity, Enable)
           {<<"set logfilter reply">>, null, mandatory},
           {<<"result">>, integer, mandatory}
          ],
-         undefined,
-         fun(L) -> get_value(<<"result">>,L) end).
+         fun(B,P) -> {L,[]} = parse(B,P), {ok,get_value(<<"result">>,L)} end,
+         Timeout).
 
--spec get_clusterlog_loglevel(pid()) -> {ok,[{integer(),integer()}]}|{error,_}.
-get_clusterlog_loglevel(Pid)
+-spec get_clusterlog_loglevel(pid(),timeout()) -> {ok,[{integer(),integer()}]}|{error,_}.
+get_clusterlog_loglevel(Pid, Timeout)
   when is_pid(Pid) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_clusterlog_loglevel/3, 3.2.7.3
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_clusterlog_loglevel/3, 3.2.7.3
+    %%
     call(Pid,
          <<"get cluster loglevel">>,
          [],
@@ -403,19 +456,23 @@ get_clusterlog_loglevel(Pid)
           {<<"error">>, integer, mandatory},
           {<<"congestion">>, integer, mandatory},
           {<<"debug">>, integer, mandatory},
-          {<<"backup">>, integer, mandatory}
+          {<<"backup">>, integer, mandatory},
+          {<<"schema">>, integer, optional}     % !, mandatory?
          ],
-         undefined,
-         fun (L) -> lists:keymap(fun match_event_category3/1,1,L) end).
+         fun(B,P) -> {L,[]} = parse(B,P), lists:keymap(fun match_event_category3/1,1,L) end,
+         Timeout).
 
--spec set_clusterlog_loglevel(pid(),integer(),integer(),integer()) -> ok|{error,_}.
-set_clusterlog_loglevel(Pid, Node, Category, Level)
+-spec set_clusterlog_loglevel(pid(),integer(),integer(),integer(),timeout()) -> ok|{error,_}.
+set_clusterlog_loglevel(Pid, Node, Category, Level, Timeout)
   when is_pid(Pid), ?IS_NODE(Node), ?IS_EVENT_CATEGORY(Category), ?IS_LOGLEVEL(Level) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_set_clusterlog_loglevel/5, 3.2.7.4
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_set_clusterlog_loglevel/5, 3.2.7.4
+    %%
     call(Pid,
          <<"set cluster loglevel">>,
          [
-          {<<"node">>, integer_to_binary(Node)}, % ignore?, TODO
+          {<<"node">>, integer_to_binary(Node)}, % ignore?
           {<<"category">>, integer_to_binary(Category)},
           {<<"level">>, integer_to_binary(Level)}
          ],
@@ -423,16 +480,19 @@ set_clusterlog_loglevel(Pid, Node, Category, Level)
           {<<"set cluster loglevel reply">>, null, mandatory},
           {<<"result">>, string, mandatory}
          ],
-         undefined,
-         fun (L) -> get_result(L) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
+         Timeout).
 
 %% -- 3.2.8. Backup Functions --
 
--spec start_backup(pid(),integer(),integer(),integer(),integer()) -> {ok,integer()}|{error,_}.
-start_backup(Pid, Version, Completed, BackupId, Backuppoint)
+-spec start_backup(pid(),integer(),integer(),integer(),integer(),timeout()) -> {ok,integer()}|{error,_}.
+start_backup(Pid, Version, Completed, BackupId, Backuppoint, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version),
        ?IS_BACKUP_WAIT(Completed), ?IS_BACKUP_ID(BackupId), ?IS_BOOLEAN(Backuppoint) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_start_backup/4, 3.2.8.1
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_start_backup/4, 3.2.8.1
+    %%
     call(Pid,
          <<"start backup">>,
          fold([
@@ -455,13 +515,16 @@ start_backup(Pid, Version, Completed, BackupId, Backuppoint)
           {<<"result">>, string, mandatory},
           {<<"id">>, integer, optional}
          ],
-         undefined,
-         fun (L) -> get_result(L, <<"id">>) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"id">>) end,
+         Timeout).
 
--spec abort_backup(pid(),integer(),integer()) -> {ok,integer()}|{error,_}.
-abort_backup(Pid, Version, BackupId)
+-spec abort_backup(pid(),integer(),integer(),timeout()) -> {ok,integer()}|{error,_}.
+abort_backup(Pid, Version, BackupId, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), is_integer(BackupId) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_abort_backup/3, 3.2.8.2
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_abort_backup/3, 3.2.8.2
+    %%
     call(Pid,
          <<"abort backup">>,
          [
@@ -471,31 +534,37 @@ abort_backup(Pid, Version, BackupId)
           {<<"abort backup reply">>, null, mandatory},
           {<<"result">>, string, mandatory}
          ],
-         undefined,
-         fun (L) -> get_result(L) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
+         Timeout).
 
 %% -- 3.2.9. Single-User Mode Functions --
 
--spec enter_single_user(pid(),integer()) -> ok|{error,_}.
-enter_single_user(Pid, Node)
+-spec enter_single_user(pid(),integer(),timeout()) -> ok|{error,_}.
+enter_single_user(Pid, Node, Timeout)
   when is_pid(Pid), ?IS_NODE(Node) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_enter_single_user/3, 3.2.9.1
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_enter_single_user/3, 3.2.9.1
+    %%
     call(Pid,
          <<"enter single user">>,
          [
-          {<<"nodeId">>, integer_to_binary(Node)} % ignore?, TODO
+          {<<"nodeId">>, integer_to_binary(Node)} % ignore?
          ],
          [
           {<<"enter single user reply">>, null, mandatory},
           {<<"result">>, string, mandatory}
          ],
-         undefined,
-         fun (L) -> get_result(L) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
+         Timeout).
 
--spec exit_single_user(pid()) -> ok|{error,_}.
-exit_single_user(Pid)
+-spec exit_single_user(pid(),timeout()) -> ok|{error,_}.
+exit_single_user(Pid, Timeout)
   when is_pid(Pid) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: exit_single_user/2, 3.2.9.2
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: exit_single_user/2, 3.2.9.2
+    %%
     call(Pid,
          <<"exit single user">>,
          [],
@@ -503,10 +572,10 @@ exit_single_user(Pid)
           {<<"exit single user reply">>, null, mandatory},
           {<<"result">>, string, mandatory}
          ],
-         undefined,
-         fun (L) -> get_result(L) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
+         Timeout).
 
-%% == private: storage/ndb/include/mgmapi/mgmapi.h ==
+%% == private: ~/include/mgmapi/mgmapi.h ==
 
 %% -- "Connect/Disconnect Management Server" --
 %%   ndb_mgm_get_connected_bind_address/1
@@ -519,31 +588,46 @@ exit_single_user(Pid)
 -spec match_node_type(binary()) -> integer().
 match_node_type(NodeType)
   when is_binary(NodeType) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_match_node_type/1
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_match_node_type/1
+    %%
     get_value(NodeType, 2, node_type(), 1, ?NDB_MGM_NODE_TYPE_UNKNOWN).
 
 -spec get_node_type_string(integer()) -> binary().
 get_node_type_string(NodeType)
   when is_integer(NodeType) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_node_type_string/1
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_node_type_string/1
+    %%
     get_value(NodeType, 1, node_type(), 2, <<"">>).
 
 -spec get_node_type_alias_string(integer()) -> binary().
 get_node_type_alias_string(NodeType)
   when is_integer(NodeType) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_node_type_alias_string/2
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_node_type_alias_string/2
+    %%
     get_value(NodeType, 1, node_type(), 3, <<"">>).
 
 -spec match_node_status(binary()) -> integer().
 match_node_status(Status)
   when is_binary(Status) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_match_node_status/1
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_match_node_status/1
+    %%
     get_value(Status, 2, node_status(), 1, ?NDB_MGM_NODE_STATUS_UNKNOWN).
 
 -spec get_node_status_string(integer()) -> binary().
 get_node_status_string(Status)
   when is_integer(Status) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_node_status_string/1
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_node_status_string/1
+    %%
     get_value(Status, 1, node_status(), 2, <<"UNKNOWN">>).
 
 match_event_severity(Severity) ->
@@ -552,13 +636,19 @@ match_event_severity(Severity) ->
 -spec get_event_severity_string(integer()) -> binary().
 get_event_severity_string(Severity)
   when is_integer(Severity) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_event_severity_string/1
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_event_severity_string/1
+    %%
     get_value(Severity, 1, event_severity(), 2, <<"">>).
 
 -spec match_event_category(binary()) -> integer().
 match_event_category(Category)
   when is_binary(Category) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_match_event_category/1
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_match_event_category/1
+    %%
     match_event_category(Category, 2).
 
 match_event_category3(Category) ->
@@ -570,76 +660,88 @@ match_event_category(Category, N) ->
 -spec get_event_category_string(integer()) -> binary().
 get_event_category_string(Category)
   when is_integer(Category) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_event_category_string/1
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_event_category_string/1
+    %%
     get_value(Category, 1, event_category(), 2, <<"">>).
 
 %% -- "Configuration handling" --
 
--spec get_configuration(pid(),integer()) -> {ok,term()}|{error,_}. % TODO
-get_configuration(Pid, Version)
+-spec get_configuration(pid(),integer(),timeout()) -> {ok,term()}|{error,_}.
+get_configuration(Pid, Version, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_configuration/2
-    get_configuration2(Pid, Version, ?API_VERSION, ?NDB_MGM_NODE_TYPE_UNKNOWN, 0).
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_configuration/2
+    %%
+    get_configuration2(Pid, Version, ?NDB_VERSION_ID, ?NDB_MGM_NODE_TYPE_UNKNOWN, 0, Timeout).
 
--spec get_configuration_from_node(pid(),integer(),integer()) -> {ok,term()}|{error,_}. % TODO
-get_configuration_from_node(Pid, Version, Node)
-  when is_pid(Pid), ?IS_VERSION(Version), ?IS_NODE(Node) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_configuration_from_node/2
-    get_configuration2(Pid, Version, 0, ?NDB_MGM_NODE_TYPE_UNKNOWN, Node). % = NDB
+-spec get_configuration_from_node(pid(),integer(),integer(),timeout()) -> {ok,term()}|{error,_}.
+get_configuration_from_node(Pid, Version, Node, Timeout)
+  when is_pid(Pid), ?IS_VERSION(Version), ?IS_NODE(Node) -> % = NDB
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_configuration_from_node/2
+    %%
+    get_configuration2(Pid, Version, 0, ?NDB_MGM_NODE_TYPE_UNKNOWN, Node, Timeout).
 
-get_configuration2(Pid, Server, Client, NodeType, Node) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_configuration2/4 (!=)
-    L = [
-         {<<"get config reply">>, null, mandatory},
-         {<<"result">>, string, mandatory},
-         {<<"Content-Length">>, integer, optional},
-         {<<"Content-Type">>, <<"ndbconfig/octet-stream">>, optional},
-         {<<"Content-Transfer-Encoding">>, <<"base64">>, optional}
-        ],
-    call(Pid,
-         <<"get config">>,
-         fold([
-               fun () when ?MIN_VERSION(Server,6,4,0) ->
-                       {<<"nodetype">>, integer_to_binary(NodeType)};
-                   () ->
-                       undefined
-               end,
-               fun () when (?MIN_VERSION(Server,7,0,27) and ?MAX_VERSION(Server,7,1,0)) orelse
-                           (?MIN_VERSION(Server,7,1,16)) ->
-                       {<<"from_node">>, integer_to_binary(Node)};
-                   () ->
-                       undefined
-               end
-              ],
+get_configuration2(Pid, Server, Client, NodeType, Node, Timeout) ->
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_configuration2/4 (!=)
+    %%
+    case call(Pid,
+              <<"get config">>,
+              fold([
+                    fun () when ?MIN_VERSION(Server,6,4,0) ->
+                            {<<"nodetype">>, integer_to_binary(NodeType)};
+                        () ->
+                            undefined
+                    end,
+                    fun () when (?MIN_VERSION(Server,7,0,27) and ?MAX_VERSION(Server,7,1,0))
+                                orelse
+                                (?MIN_VERSION(Server,7,1,16)) ->
+                            {<<"from_node">>, integer_to_binary(Node)};
+                        () ->
+                            undefined
+                    end
+                   ],
+                   [
+                    {<<"version">>, integer_to_binary(Client)}
+                   ]),
               [
-               {<<"version">>, integer_to_binary(Client)}
-              ]),
-         [],
-         fun (Handle, Binary) ->
-                 {List, []} = mgmepi_socket:parse(Handle, L, Binary),
-                 case proplists:get_value(<<"result">>, List) of
-                     <<"Ok">> ->
-                         Length = proplists:get_value(<<"Content-Length">>, List),
-                         case mgmepi_socket:recv(Handle, Length) of
-                             {ok, Base64, NextHandle} ->
-                                 Data = base64:decode(Base64),
-                                 {ok, mgmepi_config:unpack(Data), NextHandle};
-                             {error, Reason} ->
-                                 {error, Reason}
-                         end;
-                     Reason ->
-                         {error, Reason}
-                 end
-         end).
+               {<<"get config reply">>, null, mandatory},
+               {<<"result">>, string, mandatory},
+               {<<"Content-Length">>, integer, optional},
+               {<<"Content-Type">>, <<"ndbconfig/octet-stream">>, optional},
+               {<<"Content-Transfer-Encoding">>, <<"base64">>, optional}
+              ],
+              fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"Content-Length">>) end,
+              Timeout) of
+        {ok, Size} ->
+            case recv(Pid, Size+1, infinity) of % 1=end_of_protocol=?LS
+                {ok, Binary} ->
+                    {Base64, <<?LS>>} = split_binary(Binary, Size),
+                    {ok, mgmepi_config:unpack(base64:decode(Base64))};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
--spec alloc_nodeid(pid(),integer(),binary(),integer()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(Pid, Node, Name, LogEvent)
+-spec alloc_nodeid(pid(),integer(),binary(),integer(),timeout()) -> {ok,integer()}|{error,_}.
+alloc_nodeid(Pid, Node, Name, LogEvent, Timeout)
   when is_pid(Pid), ?IS_NODE(Node), is_binary(Name), ?IS_BOOLEAN(LogEvent) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_alloc_nodeid/4 (!=)
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_alloc_nodeid/4 (!=)
+    %%
     call(Pid,
          <<"get nodeid">>,
          [
-          {<<"version">>, integer_to_binary(?API_VERSION)},
+          {<<"version">>, integer_to_binary(?NDB_VERSION_ID)},
           {<<"nodetype">>, integer_to_binary(?NDB_MGM_NODE_TYPE_API)},
           {<<"nodeid">>, integer_to_binary(Node)},
           {<<"user">>, <<"mysqld">>},
@@ -655,25 +757,27 @@ alloc_nodeid(Pid, Node, Name, LogEvent)
           {<<"nodeid">>, integer, optional},
           {<<"result">>, string, mandatory}
          ],
-         undefined,
-         fun(L) -> get_result(L, <<"nodeid">>) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"nodeid">>) end,
+         Timeout).
 
--spec end_session(pid()) -> ok|{error,_}.
-end_session(Pid)
+
+-spec end_session(pid(),timeout()) -> ok|ignore|{error,_}.
+end_session(Pid, Timeout)
   when is_pid(Pid) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_end_session/1
     %%
-    %% @see storage/ndb/src/mgmsrv/Services.cpp: MgmApiSession::endSession/2
-    %%      end_of_protocol (\n) NOTEXIST !, TODO
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_end_session/1
+    %%  ~/src/mgmsrv/Services.cpp: MgmApiSession::endSession/2, NOTEXIST end_of_protocol="\n"
     %%
-    %% call(Pid,
-    %%      <<"end session">>,
-    %%      [],
-    %%      [
-    %%       {<<"end session reply">>, null, mandatory}
-    %%      ],
-    %%      undefined).
-    false.
+    call(Pid,
+         <<"end session">>,
+         [],
+         [
+          {<<"end session reply">>, null, mandatory}
+         ],
+         <<?LS>>,
+         fun(B,P) -> {[],[]} = parse(B,P), ok end,
+         Timeout).
 
 %%   ndb_mgm_destroy_configuration/1
 %%   ndb_mgm_get_fd/1
@@ -695,14 +799,17 @@ end_session(Pid)
 
 %% @see http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-online-add-node-example.html
 
--spec create_nodegroup(pid(),[integer()]) -> {ok,integer()}|{error,_}.
-create_nodegroup(Pid, Nodes)
+-spec create_nodegroup(pid(),[integer()],timeout()) -> {ok,integer()}|{error,_}.
+create_nodegroup(Pid, Nodes, Timeout)
   when is_pid(Pid), is_list(Nodes) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_create_nodegroup/4
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_create_nodegroup/4
+    %%
     call(Pid,
          <<"create nodegroup">>,
          [
-          {<<"nodes">>, implode(fun integer_to_binary/1,Nodes)}
+          {<<"nodes">>, implode(fun integer_to_binary/1,Nodes,<<" ">>)}
          ],
          [
           {<<"create nodegroup reply">>, null, mandatory},
@@ -710,12 +817,14 @@ create_nodegroup(Pid, Nodes)
           {<<"error_code">>, integer, optional},
           {<<"result">>, string, mandatory}
          ],
-         undefined,
-         fun(L) -> get_result(L, <<"ng">>) end).
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"ng">>) end,
+         Timeout).
 
--spec drop_nodegroup(pid(),integer()) -> ok|{error,_}.
-drop_nodegroup(Pid, NodeGroup) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_drop_nodegroup/3
+-spec drop_nodegroup(pid(),integer(),timeout()) -> ok|{error,_}.
+drop_nodegroup(Pid, NodeGroup, Timeout) ->
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_drop_nodegroup/3
     %%
     %% BUG: NO nodegroup -> <<"drop nodegroup reply\nresult: error: -1">>,  NO "\n"
     %%                                                      ^
@@ -730,16 +839,10 @@ drop_nodegroup(Pid, NodeGroup) ->
           {<<"result">>, string, mandatory},
           {<<"error_code">>, integer, optional}  % !
          ],
-         undefined,
-         fun(L) -> get_result(L) end).
-
-%% d ndb_mgm_filter_clusterlog/4 = ndb_mgm_set_clusterlog_severity_filter/4
-%% d ndb_mgm_get_logfilter/1 = ndb_mgm_get_clusterlog_severity_filter_old/1
-%% d ndb_mgm_set_loglevel_clusterlog/5 = ndb_mgm_set_clusterlog_loglevel/5
-%% d ndb_mgm_get_loglevel_clusterlog/1 = ndb_mgm_get_clusterlog_loglevel_old/1
+         fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
+         Timeout).
 
 %%   ndb_mgm_dump_events/4
-
 %%   ndb_mgm_call/5, cmd_bulk? TODO
 %%   ndb_mgm_call_slow/6, timout=5*60*1000 (ms)
 %%   get_mgmd_version/1
@@ -751,7 +854,7 @@ drop_nodegroup(Pid, NodeGroup) ->
 %%   free_log_handle/1
 %%   set_dynamic_ports_batched/4
 
-%% == private: storage/ndb/include/mgmapi/mgmapi_debug.h ==
+%% == private: ~/include/mgmapi/mgmapi_debug.h ==
 
 %%   ndb_mgm_start_signallog/3
 %%   ndb_mgm_stop_signallog/3
@@ -767,7 +870,7 @@ drop_nodegroup(Pid, NodeGroup) ->
 
 %% ? ndb_mgm_insert_error_impl/5
 
-%% == private: storage/ndb/include/mgmapi/mgmapi_internal.h ==
+%% == private: ~/include/mgmapi/mgmapi_internal.h ==
 
 %%   ndb_mgm_set_connection_int_parameter/6
 %%   ndb_mgm_set_dynamic_ports/4
@@ -780,27 +883,25 @@ drop_nodegroup(Pid, NodeGroup) ->
 
 %% == internal ==
 
-active(Pid, Pattern, Callback) ->
-    active(Pid, Pattern, Callback, make_ref()).
+call(Pid, Term) ->
+    mgmepi_server:call(Pid, Term).
 
-active(Pid, Pattern, Callback, Ref) ->
-    {mgmepi_server:cast(Pid, {active,Pattern,Callback,{self(),Ref}}),Ref}.
+call(Pid, Cmd, Args, Params, Callback, Timeout) ->
+    call(Pid, Cmd, Args, Params, <<?LS,?LS>>, Callback, Timeout).
 
-call(Pid, Cmd, Args, Params, Callback) ->
-    io:format("args=~p~n", [Args]),
-    mgmepi_server:call(Pid, {call,Cmd,Args,Params,Callback}).
-
-call(Pid, Cmd, Args, Params, Callback, Post) ->
-    case call(Pid, Cmd, Args, Params, Callback) of
-        {ok, List} ->
-            case Post(List) of
-                ok -> ok;
-                {error, Reason} -> {error, Reason};
-                Term -> {ok, Term}
-            end;
+call(Pid, Cmd, Args, Params, Pattern, Callback, Timeout) ->
+    case call(Pid, {call,to_packet(Cmd,Args),Pattern,Timeout}) of
+        {ok, Binary} ->
+            Callback(Binary, Params);
+        ignore ->
+            ignore;
         {error, Reason} ->
             {error, Reason}
     end.
+
+recv(Pid, Size, Timeout) ->
+    call(Pid, {recv,Size,Timeout}).
+
 
 endianness() ->
     <<N:2/native-unsigned-integer-unit:8>> = <<0,1>>,
@@ -822,18 +923,20 @@ get_result(List, Other) ->
     get_result(List, Other, undefined).
 
 get_result(List, Other, Default) when is_binary(Other) ->
-    case proplists:get_value(<<"result">>, List) of
+    case get_value(<<"result">>, List) of
         <<"Ok">> ->
-            get_value(Other, List, Default);
+            {ok, get_value(Other,List,Default)};
         0 ->
-            get_value(Other, List, Default);
+            ok;
+        -1 ->
+            {error, get_value(Other,List,Default)};
         Reason ->
             {error, Reason}
     end;
-get_result(List, Other, Default) when is_tuple(Other) ->
-    case proplists:get_value(<<"result">>, List) of
+get_result(List, Other, Default) when is_list(Other) ->
+    case get_value(<<"result">>, List) of
         <<"Ok">> ->
-            list_to_tuple([ get_value(E,List,Default) || E <- tuple_to_list(Other) ]);
+            {ok, list_to_tuple([ get_value(E,List,Default) || E <- Other ])};
         Reason ->
             {error, Reason}
     end.
@@ -852,9 +955,6 @@ get_value(Key, N, List, M, Default) ->
             element(M, Tuple)
     end.
 
-implode(Fun, List) ->
-    implode(Fun, List, <<" ">>).
-
 implode(Fun, List, Separator) ->
     implode(Fun, List, Separator, []).
 
@@ -864,6 +964,37 @@ implode(_Fun, [], _Separator, [_|T]) ->
     list_to_binary(lists:reverse(T));
 implode(Fun, [H|T], Separator, List) ->
     implode(Fun, T, Separator, [Separator|[Fun(H)|List]]).
+
+match([], Rest, List) ->
+    {lists:reverse(List), Rest};
+match([{K,string,_}|L], [[K,V]|R], List) ->
+    match(L, R, [{K,V}|List]);
+match([{K,integer,_}|L], [[K,V]|R], List) ->
+    match(L, R, [{K,binary_to_integer(V)}|List]);
+match([{K,null,_}|L],[[K]|R], List) ->
+    match(L, R, List);
+match([{K,V,_}|L], [[K,V]|R], List) ->
+    match(L, R, [{K,V}|List]);
+match([{_,_,optional}|L], R, List) ->
+    match(L, R, List).
+
+parse(Binary, Params) ->
+    parse(Binary, Params, <<?FS>>).
+
+parse(Binary, Params, FieldPattern) ->
+    match(Params, split(Binary,FieldPattern), []).
+
+split(Binary, FieldPattern) ->
+    split(Binary, FieldPattern, <<?LS>>).
+
+split(Binary, FieldPattern, LinePattern) ->
+    [ binary:split(E,FieldPattern) || E <- binary:split(Binary,LinePattern,[global]) ].
+
+to_packet(Cmd, []) ->
+    <<Cmd/binary, ?LS, ?LS>>;
+to_packet(Cmd, Args) ->
+    B = << <<K/binary,?FS,V/binary,?LS>> || {K,V} <- Args >>,
+    <<Cmd/binary, ?LS, B/binary, ?LS>>.
 
 %% -- --
 

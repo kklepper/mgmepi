@@ -1,5 +1,5 @@
 %% =============================================================================
-%% Copyright 2013-2014 AONO Tomohiko
+%% Copyright 2013-2015 AONO Tomohiko
 %%
 %% This library is free software; you can redistribute it and/or
 %% modify it under the terms of the GNU Lesser General Public
@@ -30,23 +30,24 @@
 
 %% -- internal --
 -record(state, {
-          handle :: tuple(),         % mgmepi_socket::handle()
-          from :: {pid(),term()},
-          params :: [argument()],
-          pattern :: binary:cp(),
-          callback :: function()
+          module  :: module(),
+          args    :: proplists:proplist(),
+          handle  :: tuple(),                   % baseline_socket::handle()
+          from    :: {pid(),term()},
+          pattern :: binary()|[binary()]|binary:cp(),
+          timeout :: timeout()
          }).
 
--define(SOCKET(Handle), element(2,Handle)). % !CAUTION!
+-define(SOCKET(Handle), element(2,Handle)).     % !CAUTION!
 
 %% == private ==
 
 -spec start_link(proplists:proplist()) -> {ok,pid()}|{error,_}.
 start_link(Args)
   when is_list(Args) ->
-    case gen_server:start_link(?MODULE, [], []) of
+    case gen_server:start_link(?MODULE, {baseline_socket,Args}, []) of
         {ok, Pid} ->
-            case call(Pid, {connect,Args}) of
+            case call(Pid, connect) of
                 ok ->
                     {ok, Pid};
                 {error, Reason} ->
@@ -64,7 +65,7 @@ stop(Pid)
 -spec call(pid(),term()) -> term().
 call(Pid, Term)
   when is_pid(Pid) ->
-    gen_server:call(Pid, Term, infinity). % timeout -> socket
+    gen_server:call(Pid, Term, infinity).
 
 -spec cast(pid(),term()) -> ok.
 cast(Pid, Term)
@@ -82,43 +83,42 @@ terminate(_Reason, State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-handle_call(Request, From, #state{handle=H}=S)
-  when undefined =/= H ->
-    ready(Request, From, S);
-handle_call(Request, From, State) ->
-    initialized(Request, From, State).
+handle_call({call,Packet,Term,Timeout}, _From, #state{from=undefined}=S) ->
+    ready(Packet, Term, Timeout, S);
+handle_call({recv,Term,Timeout}, _From, #state{from=undefined}=S) ->
+    ready(Term, Timeout, S);
+handle_call({active,Pattern}, From, #state{from=undefined}=S) ->
+    ready(Pattern, S#state{from = From});
+handle_call(connect, _From, #state{from=undefined}=S) ->
+    loaded(S);
+handle_call(_Request, _From, State) ->
+    {reply, ignore, State}.
 
 handle_cast(stop, State) ->
-    {stop, normal, State};
-handle_cast({active,Pattern,Callback,From}, State) ->
-    ready({active,Pattern,Callback,From}, State);
-handle_cast(_Request, State) ->
-    {noreply, State}.
+    {stop, normal, State}.
 
 handle_info({tcp,Socket,Data}, #state{handle=H,from=F}=S)
   when Socket =:= ?SOCKET(H), undefined =/= F ->
-    accepted(Data, S);
+    listen(Data, S);
 handle_info({'EXIT',_Pid,Reason}, State) ->
-    {stop, Reason, State};
-handle_info(_Info, State) ->
-    {noreply, State}.
+    {stop, Reason, State}.
 
 %% == internal ==
 
-cleanup(#state{handle=H}=S)
+cleanup(#state{module=M,handle=H}=S)
   when undefined =/= H ->
-    ok = mgmepi_socket:close(H),
+    ok = M:close(H),
     cleanup(S#state{handle = undefined});
 cleanup(#state{}) ->
     baseline:flush().
 
-setup([]) ->
+setup({Module,Args}) ->
     _ = process_flag(trap_exit, true),
-    {ok, #state{}}.
+    {ok, #state{module = Module, args = Args}}.
 
 
-initialized({connect,Args}, _From, #state{handle=undefined}=S) ->
-    case apply(mgmepi_socket, connect, Args) of
+loaded(#state{module=M,args=A,handle=undefined}=S) ->
+    case apply(M, connect, A) of
         {ok, Handle} ->
             {reply, ok, S#state{handle = Handle}};
         {error, Reason} ->
@@ -126,57 +126,39 @@ initialized({connect,Args}, _From, #state{handle=undefined}=S) ->
     end.
 
 
-ready({active,Pattern,Callback,From}, #state{handle=H,from=undefined}=S) ->
-    case mgmepi_socket:setopt_active(H, once) of
+ready(Pattern, #state{module=M,handle=H,from={_,R}}=S) ->
+    case M:setopt_active(H, once) of
         true ->
-            {noreply, S#state{from = From, pattern = Pattern, callback = Callback}}
-    end;
-ready(_Request, #state{from=F}=S)
-  when undefined =/= F ->
-    {reply, {error,ebusy}, S};
-ready(_Request, State) ->
-    {noreply, State}.
-
-ready({call,Cmd,Args,Params,Callback}, From, #state{handle=H,from=undefined}=S) ->
-    case mgmepi_socket:setopt_active(H, once) andalso mgmepi_socket:send(H, Cmd, Args) of
-        ok ->
-            {noreply, S#state{from = From, params = Params, callback = Callback}}
-    end;
-ready(_Request, _From, #state{from=F}=S)
-  when undefined =/= F ->
-    {reply, {error,ebusy}, S};
-ready(_Request, _From, State) ->
-    {noreply, State}.
-
-
-accepted(Binary, #state{handle=H,pattern=P,callback=C}=S) ->
-    %%io:format("accepted=~p~n", [Binary]),
-    case mgmepi_socket:setopt_active(H, false) andalso mgmepi_socket:recv(H, Binary, P) of
-        {ok, Packet, Handle} ->
-            received(Packet, S#state{handle = Handle}, C);
-        {error, Reason} ->
-            {stop, {error,Reason}, S}
+            {reply, {ok,R}, S#state{pattern = Pattern, timeout = timer:seconds(1)}}
     end.
 
-received(Binary, #state{params=P}=S, undefined) ->
-    %%io:format("received=~p~n", [Binary]),
-    received(Binary, S, fun(H,B) -> {L,_} = mgmepi_socket:parse(H,P,B), {ok,L,H} end);
-received(Binary, #state{handle=H,from=F}=S, Callback) ->
-    %%io:format("received=~p~n", [Binary]),
-    case Callback(H, Binary) of
-        {ok, Reply, Handle} ->
-            _ = gen_server:reply(F, {ok,Reply}),
-            {noreply, S#state{handle = Handle, from = undefined}};
-        {continue, Reply, Handle} ->
-            case mgmepi_socket:setopt_active(Handle, once) andalso Reply of
-                ignore ->
-                    ok;
-                _ ->
-                    {Pid, Ref} = F,
-                    Pid ! {Ref, Reply}
-            end,
+ready(Term, Timeout, #state{module=M,handle=H}=S) ->
+    case M:recv(H, Term, Timeout) of
+        {ok, Binary, Handle} ->
+            {reply, {ok,Binary}, S#state{handle = Handle}};
+        {error, Reason, Handle} ->
+            {stop, {error,Reason}, {error,Reason}, S#state{handle = Handle}}
+    end.
+
+ready(Packet, Term, Timeout, #state{module=M,handle=H}=S) ->
+    case M:call(H, Packet, Term, Timeout) of
+        {ok, Binary, Handle} ->
+            {reply, {ok,Binary}, S#state{handle = Handle}};
+        {error, Reason, Handle} ->
+            {stop, {error,Reason}, {error,Reason}, S#state{handle = Handle}}
+    end.
+
+
+listen(Data, #state{module=M,handle=H,from=F,pattern=P,timeout=T}=S) ->
+    case M:setopt_active(H, false) andalso M:recv(H, Data, P, T) of
+        {ok, <<>>, Handle} ->
+            true = M:setopt_active(Handle, once),
             {noreply, S#state{handle = Handle}};
-        {error, Reason} ->
-            _ = gen_server:reply(F, {error,Reason}),
-            {stop, {error,Reason}, S}
+        {ok, Binary, Handle} ->
+            _ = gen_server:reply(F, Binary),
+            listen(<<>>, S#state{handle = Handle});
+        {error, timeout, Handle} ->
+            {noreply, S#state{handle = Handle}};
+        {error, Reason, Handle} ->
+            {stop, {error,Reason}, S#state{handle = Handle}}
     end.
