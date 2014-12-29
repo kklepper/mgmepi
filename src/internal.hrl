@@ -153,8 +153,6 @@
 -define(FS, ": ").
 -define(LS, $\n).
 
--define(API_VERSION, 459525). % 7.3.5
-
 -define(IS_BACKUP_ID(T), (is_integer(T) and (0 =< T))).
 
 -define(IS_BACKUP_WAIT(T), (is_integer(T) and (0 =< T) and (2 >= T))).

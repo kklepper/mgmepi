@@ -25,9 +25,9 @@ run(2, Pid) ->
 run(1, Pid) ->
     V = 459525,
     L = [
-         {true,  fun(E) -> mgmepi_protocol:alloc_nodeid(E,201,<<"x1">>,1) end},
          {true,  fun(E) -> mgmepi_protocol:get_version(E) end},
-         {false, fun(E) -> mgmepi_protocol:check_connection(E) end},
+         {false,  fun(E) -> mgmepi_protocol:alloc_nodeid(E,201,<<"x1">>,1) end},
+         {true,  fun(E) -> mgmepi_protocol:check_connection(E) end},
          {false, fun(E) -> mgmepi_protocol:get_status(E) end},
          {false, fun(E) -> mgmepi_protocol:get_status2(E,[2]) end},
          {false, fun(E) -> mgmepi_protocol:get_status2(E,[1,2]) end},
@@ -56,7 +56,7 @@ run(1, Pid) ->
          {false, fun(E) -> run(3,E) end},
          {false, fun(E) -> mgmepi_protocol:create_nodegroup(E,[2,5]) end},
          {false, fun(E) -> mgmepi_protocol:drop_nodegroup(E,1) end},
-         {true,  fun(E) -> mgmepi_protocol:end_session(E) end}
+         {false,  fun(E) -> mgmepi_protocol:end_session(E) end}
         ],
     [ io:format("~p~n", [timer:tc(F,[Pid])]) || {true,F} <- L ];
 run(0, app) ->
@@ -76,10 +76,10 @@ run(0, server) ->
          {recbuf, 50},
          {sndbuf, 50}
         ],
-    case mgmepi_server:start_link(["127.0.0.1",9001,L,3000]) of
+    case mgmepi_server2:start_link(["127.0.0.1",9001,L,3000]) of
         {ok, P} ->
             run(1, P),
-            mgmepi_server:stop(P)
+            mgmepi_server2:stop(P)
     end.
 
 handle(_Ref, 0) ->

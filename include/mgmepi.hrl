@@ -1,6 +1,9 @@
 %% =============================================================================
 %% =============================================================================
 
+-define(NDB_VERSION_ID,                459527). % 0x00070307, != NDB_VERSION_D
+-define(MYSQL_VERSION_ID,              329237). % 0x00050615
+
 %% == define ==
 
 %% -- storage/ndb/include/mgmapi/mgmapi_config_parameters.h --
@@ -159,10 +162,11 @@
 -define(CFG_TCP_SEND_BUFFER_SIZE,                  454).
 -define(CFG_TCP_RECEIVE_BUFFER_SIZE,               455).
 -define(CFG_TCP_PROXY,                             456). % ?
--define(CFG_TCP_RCV_BUF_SIZE,                      457).
--define(CFG_TCP_SND_BUF_SIZE,                      458).
--define(CFG_TCP_MAXSEG_SIZE,                       459).
+-define(CFG_TCP_RCV_BUF_SIZE,                      457). % = SOL_SOCKET.SO_RCVBUF,0
+-define(CFG_TCP_SND_BUF_SIZE,                      458). % = SOL_SOCKET.SO_SNDBUF,0
+-define(CFG_TCP_MAXSEG_SIZE,                       459). % = IPPROTO_TCP.TCP_MAXSEG,0
 -define(CFG_TCP_BIND_INADDR_ANY,                   460).
+
 %%                                               461-499
 %%efine(CFG_SHM_SEND_SIGNAL_ID,                    500). % ?
 %%efine(CFG_SHM_CHECKSUM,                          501). % ?
@@ -210,7 +214,7 @@
 -define(CFG_DB_NO_REDOLOG_PARTS,                   632).
 -define(CFG_DB_AT_RESTART_SKIP_INDEXES,            633). % !
 -define(CFG_DB_AT_RESTART_SKIP_FKS,                634). % !
-%%efine(CFG_DB_SERVER_PORT,                        635).
+%%efine(CFG_DB_SERVER_PORT,                        635). > CFG_CONNECTION_SERVER_PORT
 -define(CFG_DB_TCPBIND_INADDR_ANY,                 636). % !
 
 %% "API Config variables"
@@ -234,8 +238,8 @@
 -define(NDB_MGM_EVENT_SEVERITY_CRITICAL, 5).
 -define(NDB_MGM_EVENT_SEVERITY_ALERT,    6).
 -define(NDB_MGM_EVENT_SEVERITY_ALL,      7).
--define(NDB_MGM_MIN_EVENT_SEVERITY,      ?NDB_MGM_EVENT_SEVERITY_ON).  % ADD
--define(NDB_MGM_MAX_EVENT_SEVERITY,      ?NDB_MGM_EVENT_SEVERITY_ALL). % ADD
+-define(NDB_MGM_MIN_EVENT_SEVERITY,      ?NDB_MGM_EVENT_SEVERITY_ON).  % add
+-define(NDB_MGM_MAX_EVENT_SEVERITY,      ?NDB_MGM_EVENT_SEVERITY_ALL). % add
 
 %% enum ndb_mgm_event_category
 -define(NDB_MGM_ILLEGAL_EVENT_CATEGORY,      -1).
@@ -249,8 +253,14 @@
 -define(NDB_MGM_EVENT_CATEGORY_CONGESTION,   ?CFG_LOGLEVEL_CONGESTION).
 -define(NDB_MGM_EVENT_CATEGORY_DEBUG,        ?CFG_LOGLEVEL_DEBUG).
 -define(NDB_MGM_EVENT_CATEGORY_INFO,         ?CFG_LOGLEVEL_INFO).
--define(NDB_MGM_EVENT_CATEGORY_WARNING,      ?CFG_LOGLEVEL_WARNING). % ADD
+-define(NDB_MGM_EVENT_CATEGORY_WARNING,      ?CFG_LOGLEVEL_WARNING). % add
 -define(NDB_MGM_EVENT_CATEGORY_ERROR,        ?CFG_LOGLEVEL_ERROR).
 -define(NDB_MGM_EVENT_CATEGORY_SCHEMA,       ?CFG_LOGLEVEL_SCHEMA).
 -define(NDB_MGM_MIN_EVENT_CATEGORY,          ?CFG_MIN_LOGLEVEL).
 -define(NDB_MGM_MAX_EVENT_CATEGORY,          ?CFG_MAX_LOGLEVEL).
+
+%%
+
+-type(config() :: [{non_neg_integer(),integer()|binary()}]).
+
+-export_type([config/0]).

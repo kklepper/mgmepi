@@ -1,5 +1,5 @@
 %% =============================================================================
-%% Copyright 2013-2014 AONO Tomohiko
+%% Copyright 2013-2015 AONO Tomohiko
 %%
 %% This library is free software; you can redistribute it and/or
 %% modify it under the terms of the GNU Lesser General Public
@@ -29,15 +29,15 @@
 -export([start_backup/5,abort_backup/3]).
 -export([enter_single_user/2, exit_single_user/1]).
 
-%% -- private: storage/ndb/include/mgmapi/mgmapi.h --
+%% -- private: ~/include/mgmapi/mgmapi.h --
 -export([match_node_type/1, get_node_type_string/1, get_node_type_alias_string/1,
          match_node_status/1, get_node_status_string/1, get_event_severity_string/1,
          match_event_category/1, get_event_category_string/1]).
 -export([get_configuration/2, get_configuration_from_node/3]).
--export([alloc_nodeid/4, end_session/1]).
+-export([alloc_nodeid/4]).
 -export([create_nodegroup/2, drop_nodegroup/2]).
 
-%% -- private: storage/ndb/include/mgmapi/mgmapi_debug.h
+%% -- private: ~/include/mgmapi/mgmapi_debug.h
 
 %% == private: http://dev.mysql.com/doc/ndbapi/en/mgm-functions.html ==
 
@@ -102,8 +102,11 @@ listen_event(Pid, Filter) ->
 -spec get_version(pid()) -> {ok,integer()}|{error,_}.
 get_version(Pid)
   when is_pid(Pid) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_version/6, 3.2.4.5
-    call(Pid,
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_get_version/6, 3.2.4.5
+    %%
+    sync(Pid,
          <<"get version">>,
          [],
          [
@@ -117,22 +120,23 @@ get_version(Pid)
           {<<"mysql_minor">>, integer, optional},
           {<<"mysql_build">>, integer, optional}
          ],
-         undefined,
-         fun(L) -> get_value(<<"id">>,L) end).
+         fun(B,P) -> {L,_} = parse(B,P), get_value(<<"id">>,L) end).
 
 -spec check_connection(pid()) -> ok|{error,_}.
 check_connection(Pid)
   when is_pid(Pid) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_check_connection/1, 3.2.4.7
-    call(Pid,
+    %%
+    %% @see
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_check_connection/1, 3.2.4.7
+    %%
+    sync(Pid,
          <<"check connection">>,
          [],
          [
           {<<"check connection reply">>, null, mandatory},
           {<<"result">>, string, mandatory}
          ],
-         undefined,
-         fun(L) -> get_result(L) end).
+         fun(B,P) -> {L,_} = parse(B,P), get_result(L) end).
 
 %%  1 ndb_mgm_get_connectstring/3
 %%  2 ndb_mgm_get_configuration_nodeid/1
@@ -579,7 +583,7 @@ get_event_category_string(Category)
 get_configuration(Pid, Version)
   when is_pid(Pid), ?IS_VERSION(Version) ->
     %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_get_configuration/2
-    get_configuration2(Pid, Version, ?API_VERSION, ?NDB_MGM_NODE_TYPE_UNKNOWN, 0).
+    get_configuration2(Pid, Version, ?NDB_VERSION_ID, ?NDB_MGM_NODE_TYPE_UNKNOWN, 0).
 
 -spec get_configuration_from_node(pid(),integer(),integer()) -> {ok,term()}|{error,_}. % TODO
 get_configuration_from_node(Pid, Version, Node)
@@ -639,7 +643,7 @@ alloc_nodeid(Pid, Node, Name, LogEvent)
     call(Pid,
          <<"get nodeid">>,
          [
-          {<<"version">>, integer_to_binary(?API_VERSION)},
+          {<<"version">>, integer_to_binary(?NDB_VERSION_ID)},
           {<<"nodetype">>, integer_to_binary(?NDB_MGM_NODE_TYPE_API)},
           {<<"nodeid">>, integer_to_binary(Node)},
           {<<"user">>, <<"mysqld">>},
@@ -658,22 +662,22 @@ alloc_nodeid(Pid, Node, Name, LogEvent)
          undefined,
          fun(L) -> get_result(L, <<"nodeid">>) end).
 
--spec end_session(pid()) -> ok|{error,_}.
-end_session(Pid)
-  when is_pid(Pid) ->
-    %% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_end_session/1
-    %%
-    %% @see storage/ndb/src/mgmsrv/Services.cpp: MgmApiSession::endSession/2
-    %%      end_of_protocol (\n) NOTEXIST !, TODO
-    %%
-    %% call(Pid,
-    %%      <<"end session">>,
-    %%      [],
-    %%      [
-    %%       {<<"end session reply">>, null, mandatory}
-    %%      ],
-    %%      undefined).
-    false.
+%%-spec end_session(pid()) -> ok|{error,_}.
+%%end_session(Pid)
+%%  when is_pid(Pid) ->
+%% storage/ndb/src/mgmapi/mgmapi.cpp: ndb_mgm_end_session/1
+%%
+%% @see storage/ndb/src/mgmsrv/Services.cpp: MgmApiSession::endSession/2
+%%      end_of_protocol (\n) NOTEXIST !, TODO
+%%
+%% call(Pid,
+%%      <<"end session">>,
+%%      [],
+%%      [
+%%       {<<"end session reply">>, null, mandatory}
+%%      ],
+%%      undefined).
+%%   false.
 
 %%   ndb_mgm_destroy_configuration/1
 %%   ndb_mgm_get_fd/1
@@ -779,6 +783,44 @@ drop_nodegroup(Pid, NodeGroup) ->
 %%   ndb_mgm_get_configuration2/4
 
 %% == internal ==
+
+sync(Pid, Cmd, Args, Params, Filter) ->
+    case mgmepi_server2:call(Pid, to_command(Cmd,Args)) of
+        {ok, Binary} ->
+            {ok, Filter(Binary,Params)};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+to_command(Cmd, Args) ->
+    B = << <<K/binary,?FS,V/binary,?LS>> || {K,V} <- Args >>,
+    {command, <<Cmd/binary,?LS,B/binary,?LS>>}.
+
+parse(Binary, Params) ->
+    L = split(Binary),
+    %%io:format("parse: ~p -> ~p~n", [Binary,L]),
+    match(Params, L, []).
+
+split(Binary) ->
+    split(Binary, binary:compile_pattern(<<?FS>>), binary:compile_pattern(<<?LS>>)).
+
+split(Binary, FieldPattern, LinePattern) ->
+    [ binary:split(E,FieldPattern) || E <- binary:split(Binary,LinePattern,[global]) ].
+
+match([], Rest, List) ->
+    {lists:reverse(List), Rest};
+match([{K,string,_}|L], [[K,V]|R], List) ->
+    match(L, R, [{K,V}|List]);
+match([{K,integer,_}|L], [[K,V]|R], List) ->
+    match(L, R, [{K,binary_to_integer(V)}|List]);
+match([{K,null,_}|L],[[K]|R], List) ->
+    match(L, R, List);
+match([{K,V,_}|L], [[K,V]|R], List) ->
+    match(L, R, [{K,V}|List]);
+match([{_,_,optional}|L], R, List) ->
+    match(L, R, List).
+
+%% --
 
 active(Pid, Pattern, Callback) ->
     active(Pid, Pattern, Callback, make_ref()).
