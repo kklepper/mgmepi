@@ -1,5 +1,5 @@
 %% =============================================================================
-%% Copyright 2013-2014 AONO Tomohiko
+%% Copyright 2013-2015 AONO Tomohiko
 %%
 %% This library is free software; you can redistribute it and/or
 %% modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,32 @@
 
 %% -- internal --
 
-%% -- storage/ndb/include/util/ConfigValues.hpp --
+%% -- ~/include/mgmapi/mgmapi_config_parameters.h --
+
+-define(CFG_DB_STOP_ON_ERROR_INSERT, 1). % ?
+
+-define(CFG_TYPE_OF_SECTION,     999).
+-define(CFG_SECTION_SYSTEM,     1000).
+-define(CFG_SECTION_NODE,       2000).
+-define(CFG_SECTION_CONNECTION, 3000).
+
+-define(NODE_TYPE_DB,  ?NDB_MGM_NODE_TYPE_NDB).
+-define(NODE_TYPE_API, ?NDB_MGM_NODE_TYPE_API).
+-define(NODE_TYPE_MGM, ?NDB_MGM_NODE_TYPE_MGM).
+
+-define(CONNECTION_TYPE_TCP, 0).
+%%efine(CONNECTION_TYPE_SHM, 1).
+%%efine(CONNECTION_TYPE_SCI, 2).
+%%efine(CONNECTION_TYPE_OSE, 3).
+
+%%efine(ARBIT_METHOD_DISABLED,     0).
+%%efine(ARBIT_METHOD_DEFAULT,      1).
+%%efine(ARBIT_METHOD_WAITEXTERNAL, 2).
+
+%%efine(OPERATION_REDO_PROBLEM_ACTION_ABORT, 0).
+%%efine(OPERATION_REDO_PROBLEM_ACTION_QUEUE, 1).
+
+%% -- ~/include/util/ConfigValues.hpp --
 
 %% enum: ConfigValues::ValueType
 -define(VALUETYPE_INT,     1).
@@ -35,7 +60,7 @@
 -define(VALUETYPE_SECTION, 3).
 -define(VALUETYPE_INT64,   4).
 
-%% -- storage/ndb/src/common/util/ConfigValues.cpp --
+%% -- ~/src/common/util/ConfigValues.cpp --
 
 -define(KEYVAL(I),  (I band 16#00003FFF)).          % KP_KEYVAL_(MASK|SHIFT)
 -define(SECTION(I), (I band (16#00003FFF bsl 14))). % KP_SECTION_(MASK|SHIFT)
@@ -43,7 +68,8 @@
 
 %% == private ==
 
-%% @see storage/ndb/src/common/util/ConfigValues.cpp: ConfigValuesFactory::unpack/2
+%% @see
+%%  ~/src/common/util/ConfigValues.cpp: ConfigValuesFactory::unpack/2
 
 -spec unpack(binary()) -> proplists:proplist().
 unpack(Binary)
@@ -152,7 +178,8 @@ zip(Previous, [{Section,K,V}|T], List1, List2) ->
 
 %% ---
 
-%% storage/ndb/src/mgmsrv/ConfigInfo.cpp
+%% @see
+%%  ~/src/mgmsrv/ConfigInfo.cpp
 
 config(?CFG_SECTION_SYSTEM, ?CFG_SECTION_SYSTEM) ->
     [

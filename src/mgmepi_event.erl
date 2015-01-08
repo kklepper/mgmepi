@@ -1,5 +1,5 @@
 %% =============================================================================
-%% Copyright 2013-2014 AONO Tomohiko
+%% Copyright 2013-2015 AONO Tomohiko
 %%
 %% This library is free software; you can redistribute it and/or
 %% modify it under the terms of the GNU Lesser General Public
@@ -17,35 +17,16 @@
 
 -module(mgmepi_event).
 
--include("internal.hrl").
+-include("../include/mgmepi_event.hrl").
 
 %% -- private --
--export([parse/2]).
+-export([params/1]).
 
-%% == private == TODO, unsigned??
+%% == private ==
 
--spec parse([property()],[fragment()]) -> [property()].
-parse(Header, Rest) ->
-    Category = proplists:get_value(<<"type">>, Header),
-    {List, []} = mgmepi_socket:match(params(Category), Rest),
-    Header ++ List.
+%% @see
+%%  ~/src/mgmapi/ndb_logevent.cpp: ndb_logevent
 
-%% storage/ndb/src/common/debugger/EventLogger.cpp: EventLoggerBase::matrix
-
-%% *  EVENT-CATEGORY LOG-LEVEL
-%% *
-%% *  Startup         4
-%% *  Shutdown        1
-%% *  Statistic       2
-%% *  Checkpoint      5
-%% *  NodeRestart     8
-%% *  Connection      2
-%% *  Error          15
-%% *  Info           10
-
-%% storage/ndb/src/mgmapi/ndb_logevent.cpp: ndb_logevent
-
-                                                % RawData [29]
 %% -- NDB_MGM_EVENT_CATEGORY_STARTUP --
 params(?NDB_LE_NDBStartStarted) -> % INFO,1
     [

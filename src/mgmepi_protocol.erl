@@ -20,7 +20,7 @@
 -include("internal.hrl").
 
 %% -- private: http://dev.mysql.com/doc/ndbapi/en/mgm-functions.html --
--export([listen_event/2, get_event/1]).
+-export([listen_event/3, get_event/1]).
 -export([get_version/2, check_connection/2]).
 -export([get_status/2, get_status2/3, dump_state/4]).
 -export([start/3, start/4, stop/4, stop/5, stop/6, restart/6, restart/8]).
@@ -37,63 +37,65 @@
 -export([alloc_nodeid/5, end_session/2]).
 -export([create_nodegroup/3, drop_nodegroup/3]).
 
-%% -- private: ~/include/mgmapi/mgmapi_debug.h
-
 %% == private: http://dev.mysql.com/doc/ndbapi/en/mgm-functions.html ==
 
-%% -- 3.2.1. Log Event Functions -- TODO
+%% -- 3.2.1. Log Event Functions --
 
-listen_event(Pid, Filter) ->
+-spec listen_event(pid(),[{integer(),integer()}],timeout()) -> {ok,reference()}|{error,_}.
+listen_event(Pid, Filter, Timeout)
+  when is_pid(Pid), is_list(Filter) ->
     %%
     %% @see
     %%  ~/src/mgmapi/mgmapi.cpp : ndb_mgm_listen_event/2, 3.2.1.1
     %%
-    call(Pid,
-         <<"listen event">>,
-         [
-          {<<"parsable">>, <<"1">>},
-          {<<"filter">>, implode(fun(E) -> E end, Filter, <<"">>)}
-         ],
-         [
-          {<<"listen event">>, null, mandatory},
-          {<<"result">>, integer, mandatory},
-          {<<"msg">>, string, optional}
-         ],
-         fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"msg">>) end).
+    F = fun({C,L}) -> implode(fun integer_to_list/1,[C,L],<<"=">>) end,
+    case call(Pid,
+              <<"listen event">>,
+              [
+               {<<"parsable">>, <<"1">>},
+               {<<"filter">>, implode(F,Filter,<<" ">>)}
+              ],
+              [
+               {<<"listen event">>, null, mandatory},
+               {<<"result">>, integer, mandatory},
+               {<<"msg">>, string, optional}
+              ],
+              fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"msg">>) end,
+              Timeout) of
+        ok ->
+            call(Pid, {active,[<<"<PING>",?LS>>,<<?LS,?LS>>]});
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
-get_event(Pid)
-  when is_pid(Pid) ->
+%% unlisten_event -> STOP!
+
+-spec get_event(binary()) -> [{binary(),term()}].
+get_event(Binary)
+  when is_binary(Binary) ->
     %%
     %% @see
-    %%  ~/src/mgmapi/ndb_logevent.cpp: ndb_logevent_get_next/3, 3.2.1.5
+    %%  ~/src/mgmapi/ndb_logevent.cpp: ndb_logevent_get_next2/3, 3.2.1.6
     %%
-    L = [
-         {<<"log event reply">>, null, mandatory},
-         {<<"type">>, integer, mandatory},
-         {<<"time">>, integer, mandatory},
-         {<<"source_nodeid">>, integer, mandatory}
-        ],
-    P = binary:compile_pattern(<<"=">>),
-    active(Pid,
-           binary:compile_pattern([<<"<PING>",?LS>>,<<?LS,?LS>>]),
-           fun (Handle, <<>>) ->
-                   {continue, ignore, Handle};
-               (Handle, Binary) ->
-                   {Header, Rest} = mgmepi_socket:parse(Handle, L, Binary, P),
-                   {continue, mgmepi_event:parse(Header,Rest), Handle}
-           end).
-
-active(Pid, Pattern, Callback) ->
-    active(Pid, Pattern, Callback, make_ref()).
-
-active(Pid, Pattern, Callback, Ref) ->
-    {mgmepi_server:cast(Pid, {active,Pattern,Callback,{self(),Ref}}),Ref}.
+    {H, R} = parse(Binary,
+                   [
+                    {<<"log event reply">>, null, mandatory},
+                    {<<"type">>, integer, mandatory},
+                    {<<"time">>, integer, mandatory},
+                    {<<"source_nodeid">>, integer, mandatory}
+                   ],
+                   <<"=">>),
+    case match(mgmepi_event:params(get_value(<<"type">>,H)), R, H) of
+        {L, []} ->
+            L
+    end.
 
 %%  2 ndb_mgm_create_logevent_handle/2
 %%  3 ndb_mgm_destroy_logevent_handle/1
 %%  4 ndb_logevent_get_fd/1
-%%  6 ndb_logevent_get_latest_error/1
-%%  7 ndb_logevent_get_latest_error_msg/1
+%%  5 ndb_logevent_get_next/3
+%%  7 ndb_logevent_get_latest_error/1
+%%  8 ndb_logevent_get_latest_error_msg/1
 
 %% -- 3.2.2. MGM API Error Handling Functions --
 %%  1 ndb_mgm_get_latest_error/1
@@ -130,7 +132,7 @@ get_version(Pid, Timeout)
           {<<"mysql_minor">>, integer, optional},
           {<<"mysql_build">>, integer, optional}
          ],
-         fun(B,P) -> {L,[]} = parse(B,P), {ok,get_value(<<"id">>,L)} end,
+         fun(B,P) -> {L,[]} = parse(B,P), io:format("~p~n",[L]),{ok,get_value(<<"id">>,L)} end,
          Timeout).
 
 -spec check_connection(pid(),timeout()) -> ok|{error,_}.
@@ -216,7 +218,7 @@ dump_state(Pid, Node, Args, Timeout)
          fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
          Timeout).
 
-%% -- 3.2.6. Start/stop nodes --
+%% -- 3.2.6. Functions for Starting & Stopping Nodes --
 
 -spec start(pid(),integer(),timeout()) -> {ok,integer()}|{error,_}.
 start(Pid, Version, Timeout)
@@ -573,7 +575,7 @@ exit_single_user(Pid, Timeout)
          fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
          Timeout).
 
-%% == private: storage/ndb/include/mgmapi/mgmapi.h ==
+%% == private: ~/include/mgmapi/mgmapi.h ==
 
 %% -- "Connect/Disconnect Management Server" --
 %%   ndb_mgm_get_connected_bind_address/1
@@ -759,7 +761,7 @@ alloc_nodeid(Pid, Node, Name, LogEvent, Timeout)
          Timeout).
 
 
--spec end_session(pid(),timeout()) -> ok|{error,_}.
+-spec end_session(pid(),timeout()) -> ok|ignore|{error,_}.
 end_session(Pid, Timeout)
   when is_pid(Pid) ->
     %%
@@ -773,7 +775,7 @@ end_session(Pid, Timeout)
          [
           {<<"end session reply">>, null, mandatory}
          ],
-         binary:compile_pattern(<<?LS>>),
+         <<?LS>>,
          fun(B,P) -> {[],[]} = parse(B,P), ok end,
          Timeout).
 
@@ -840,13 +842,7 @@ drop_nodegroup(Pid, NodeGroup, Timeout) ->
          fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
          Timeout).
 
-%% d ndb_mgm_filter_clusterlog/4 = ndb_mgm_set_clusterlog_severity_filter/4
-%% d ndb_mgm_get_logfilter/1 = ndb_mgm_get_clusterlog_severity_filter_old/1
-%% d ndb_mgm_set_loglevel_clusterlog/5 = ndb_mgm_set_clusterlog_loglevel/5
-%% d ndb_mgm_get_loglevel_clusterlog/1 = ndb_mgm_get_clusterlog_loglevel_old/1
-
 %%   ndb_mgm_dump_events/4
-
 %%   ndb_mgm_call/5, cmd_bulk? TODO
 %%   ndb_mgm_call_slow/6, timout=5*60*1000 (ms)
 %%   get_mgmd_version/1
@@ -858,7 +854,7 @@ drop_nodegroup(Pid, NodeGroup, Timeout) ->
 %%   free_log_handle/1
 %%   set_dynamic_ports_batched/4
 
-%% == private: storage/ndb/include/mgmapi/mgmapi_debug.h ==
+%% == private: ~/include/mgmapi/mgmapi_debug.h ==
 
 %%   ndb_mgm_start_signallog/3
 %%   ndb_mgm_stop_signallog/3
@@ -874,7 +870,7 @@ drop_nodegroup(Pid, NodeGroup, Timeout) ->
 
 %% ? ndb_mgm_insert_error_impl/5
 
-%% == private: storage/ndb/include/mgmapi/mgmapi_internal.h ==
+%% == private: ~/include/mgmapi/mgmapi_internal.h ==
 
 %%   ndb_mgm_set_connection_int_parameter/6
 %%   ndb_mgm_set_dynamic_ports/4
@@ -887,22 +883,24 @@ drop_nodegroup(Pid, NodeGroup, Timeout) ->
 
 %% == internal ==
 
-call(Pid, Cmd, Args, Params, Filter) ->
-    call(Pid, Cmd, Args, Params, Filter, 3000).
+call(Pid, Term) ->
+    mgmepi_server:call(Pid, Term).
 
-call(Pid, Cmd, Args, Params, Filter, Timeout) ->
-    call(Pid, Cmd, Args, Params, binary:compile_pattern(<<?LS,?LS>>), Filter, Timeout).
+call(Pid, Cmd, Args, Params, Callback, Timeout) ->
+    call(Pid, Cmd, Args, Params, <<?LS,?LS>>, Callback, Timeout).
 
-call(Pid, Cmd, Args, Params, Pattern, Filter, Timeout) ->
-    case mgmepi_server:call(Pid, {call,to_packet(Cmd,Args),Pattern,Timeout}) of
+call(Pid, Cmd, Args, Params, Pattern, Callback, Timeout) ->
+    case call(Pid, {call,to_packet(Cmd,Args),Pattern,Timeout}) of
         {ok, Binary} ->
-            Filter(Binary,Params);
+            Callback(Binary, Params);
+        ignore ->
+            ignore;
         {error, Reason} ->
             {error, Reason}
     end.
 
 recv(Pid, Size, Timeout) ->
-    mgmepi_server:call(Pid, {recv,Size,Timeout}).
+    call(Pid, {recv,Size,Timeout}).
 
 
 endianness() ->
@@ -929,7 +927,9 @@ get_result(List, Other, Default) when is_binary(Other) ->
         <<"Ok">> ->
             {ok, get_value(Other,List,Default)};
         0 ->
-            {ok, get_value(Other,List,Default)}; % listen_event
+            ok;
+        -1 ->
+            {error, get_value(Other,List,Default)};
         Reason ->
             {error, Reason}
     end;
@@ -979,10 +979,13 @@ match([{_,_,optional}|L], R, List) ->
     match(L, R, List).
 
 parse(Binary, Params) ->
-    match(Params, split(Binary), []).
+    parse(Binary, Params, <<?FS>>).
 
-split(Binary) ->
-    split(Binary, binary:compile_pattern(<<?FS>>), binary:compile_pattern(<<?LS>>)).
+parse(Binary, Params, FieldPattern) ->
+    match(Params, split(Binary,FieldPattern), []).
+
+split(Binary, FieldPattern) ->
+    split(Binary, FieldPattern, <<?LS>>).
 
 split(Binary, FieldPattern, LinePattern) ->
     [ binary:split(E,FieldPattern) || E <- binary:split(Binary,LinePattern,[global]) ].

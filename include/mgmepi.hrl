@@ -6,7 +6,34 @@
 
 %% == define ==
 
-%% -- storage/ndb/include/mgmapi/mgmapi_config_parameters.h --
+%% -- ~/include/kernel/ndb_limits.h --
+-define(MAX_NODES_ID, 255).
+
+%% -- ~/include/mgmapi/mgmapi.h --
+
+%% enum ndb_mgm_node_type
+-define(NDB_MGM_NODE_TYPE_UNKNOWN, -1).
+-define(NDB_MGM_NODE_TYPE_API,      1).
+-define(NDB_MGM_NODE_TYPE_NDB,      0).
+-define(NDB_MGM_NODE_TYPE_MGM,      2).
+-define(NDB_MGM_NODE_TYPE_MIN,      0).
+-define(NDB_MGM_NODE_TYPE_MAX,      3).
+
+%% enum ndb_mgm_node_status
+-define(NDB_MGM_NODE_STATUS_UNKNOWN,       0).
+-define(NDB_MGM_NODE_STATUS_NO_CONTACT,    1).
+-define(NDB_MGM_NODE_STATUS_NOT_STARTED,   2).
+-define(NDB_MGM_NODE_STATUS_STARTING,      3).
+-define(NDB_MGM_NODE_STATUS_STARTED,       4).
+-define(NDB_MGM_NODE_STATUS_SHUTTING_DOWN, 5).
+-define(NDB_MGM_NODE_STATUS_RESTARTING,    6).
+-define(NDB_MGM_NODE_STATUS_SINGLEUSER,    7).
+-define(NDB_MGM_NODE_STATUS_RESUME,        8).
+-define(NDB_MGM_NODE_STATUS_CONNECTED,     9).
+%%efine(NDB_MGM_NODE_STATUS_MIN,           0).
+%%efine(NDB_MGM_NODE_STATUS_MAX,           9).
+
+%% -- ~/include/mgmapi/mgmapi_config_parameters.h --
 
 -define(CFG_SYS_NAME,                                3).
 -define(CFG_SYS_PRIMARY_MGM_NODE,                    1).
@@ -226,7 +253,7 @@
 -define(CFG_DEFAULT_OPERATION_REDO_PROBLEM_ACTION, 805). % ?
 -define(CFG_DEFAULT_HASHMAP_SIZE,                  806). % ?
 
-%% -- storage/ndb/include/mgmapi/ndb_logevent.h --
+%% -- ~/include/mgmapi/ndb_logevent.h --
 
 %% enum ndb_mgm_event_severity
 -define(NDB_MGM_ILLEGAL_EVENT_SEVERITY, -1).
@@ -259,7 +286,7 @@
 -define(NDB_MGM_MIN_EVENT_CATEGORY,          ?CFG_MIN_LOGLEVEL).
 -define(NDB_MGM_MAX_EVENT_CATEGORY,          ?CFG_MAX_LOGLEVEL).
 
-%%
+%% == type ==
 
 -type(config() :: [{non_neg_integer(),integer()|binary()}]).
 
