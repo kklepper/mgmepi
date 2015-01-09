@@ -31,9 +31,3 @@
                           and (?NDB_MGM_NODE_TYPE_MAX >  T))).
 
 -define(IS_VERSION(T), (is_integer(T))). % > 5.1 (restart:V2)
-
--define(VERSION(Major,Minor,Build), ((Major bsl 16) bor (Minor bsl 8) bor (Build bsl 0))).
-
--define(MIN_VERSION(Target,Major,Minor,Build), (Target >= ?VERSION(Major,Minor,Build))).
-
--define(MAX_VERSION(Target,Major,Minor,Build), (Target < ?VERSION(Major,Minor,Build))).

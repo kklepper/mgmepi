@@ -35,28 +35,33 @@ groups() -> [
                                ]}
             ].
 
-init_per_suite(Config) ->
-    ok = application:load(mgmepi),
-    Config.
-
 init_per_group(Group, Config) ->
     init_per_group(Group, Config, prefix(Group,<<"pool_">>)).
 
 init_per_group(_Group, Config, false) ->
     Config;
 init_per_group(Group, Config, true) ->
-    [ ok = application:set_env(mgmepi,P,V) || {P,V} <- ct:get_config(Group,Config) ],
+    ok = set_env(ct:get_config(Group,Config)),
     ok = test(start, []),
-    init_per_group(Group, Config, false).
+    case test(get_version, []) of
+        {ok, Version} when ?NDB_VERSION_ID < Version ->
+            {skip, max_version};
+        {ok, Version} when ?VERSION(7,3,0) > Version ->
+            {skip, min_version};
+        {ok, Version} ->
+            [{version,Version}|Config];
+        {error, Reason} ->
+            {skip, Reason}
+    end.
 
 end_per_group(Group, Config) ->
     end_per_group(Group, Config, prefix(Group,<<"pool_">>)).
 
 end_per_group(_Group, Config, false) ->
     Config;
-end_per_group(Group, Config, _) ->
+end_per_group(_Group, Config, true) ->
     ok = test(stop, []),
-    end_per_group(Group, Config, false).
+    proplists:delete(version,Config).
 
 %% == test ==
 
@@ -68,16 +73,28 @@ version_test(_Config) ->
 
 %% -- group: test_normal --
 
-get_version_test(_Config) ->
-    X = [
-         { [], {ok,?NDB_VERSION_ID} }
-        ],
-    [ E = test(get_version,A) || {A,E} <- X ].
+get_version_test(Config) ->
+    get_version_test(Config, ?config(version,Config)).
+
+get_version_test(_Config, Version)
+  when ?NDB_VERSION_ID < Version ->
+    {skip, max_version};
+get_version_test(_Config, _Version) ->
+    ok.
 
 %% == other ==
 
 prefix(Atom, Binary) ->
     nomatch =/= binary:match(atom_to_binary(Atom,latin1), Binary, [{scope,{0,size(Binary)}}]).
 
+set_env([]) ->
+    ok;
+set_env([{P,V}|T]) ->
+    ok = test(application, set_env, [mgmepi,P,V]),
+    set_env(T).
+
 test(Function, Args) ->
-    baseline_ct:test(mgmepi, Function, Args).
+    test(mgmepi, Function, Args).
+
+test(Module, Function, Args) ->
+    baseline_ct:test(Module, Function, Args).

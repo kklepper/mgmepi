@@ -286,6 +286,13 @@
 -define(NDB_MGM_MIN_EVENT_CATEGORY,          ?CFG_MIN_LOGLEVEL).
 -define(NDB_MGM_MAX_EVENT_CATEGORY,          ?CFG_MAX_LOGLEVEL).
 
+%% -- other --
+
+-define(VERSION(Major,Minor,Build), ((Major bsl 16) bor (Minor bsl 8) bor (Build bsl 0))).
+
+-define(MIN_VERSION(Target,Major,Minor,Build), (Target >= ?VERSION(Major,Minor,Build))).
+-define(MAX_VERSION(Target,Major,Minor,Build), (Target <  ?VERSION(Major,Minor,Build))).
+
 %% == type ==
 
 -type(config() :: [{non_neg_integer(),integer()|binary()}]).
