@@ -96,7 +96,8 @@ end_per_testcase(TestCase, Config) ->
 end_per_testcase(_TestCase, Config, undefined) ->
     Config;
 end_per_testcase(_TestCase, Config, Node) ->
-    ct:log("TODO: end_session=~p", [Node]),
+    ct:log("end_session=~p", [Node]),
+    ok = test(end_session, []),
     proplists:delete(node,Config).
 
 %% == test ==
@@ -107,7 +108,7 @@ version_test(_Config) ->
         ],
     [ E = test(version,A) || {A,E} <- X ].
 
-%% -- group: test_normal --
+%% -- group: test_sequence --
 
 alloc_nodeid_test(Config) ->
     N = ?config(node,Config),
@@ -126,6 +127,8 @@ alloc_nodeid_test(Config) ->
          }
         ],
     [ E = test(alloc_nodeid,A) || {A,E} <- X ].
+
+%% -- group: test_parallel_* --
 
 alloc_nodeid_test_1(Config) ->
     undefined =/= ?config(node, Config).
