@@ -12,7 +12,7 @@
 
 -define(IS_BACKUP_WAIT(T), (is_integer(T) and (0 =< T) and (2 >= T))).
 
--define(IS_BOOLEAN(T), (is_integer(T) and (0 =< T) and (1 >= T))).
+-define(IS_BOOLEAN(T), (true =:= T orelse false =:= T)).
 
 -define(IS_EVENT_CATEGORY(T), (is_integer(T)
                                and (?NDB_MGM_MIN_EVENT_CATEGORY =< T)

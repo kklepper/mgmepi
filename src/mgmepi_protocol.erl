@@ -268,12 +268,12 @@ start(Pid, Version, [H|T], Timeout, Started) ->
             {error, Reason}
     end.
 
--spec stop(pid(),integer(),integer(),timeout()) -> {ok,{integer(),integer()}}|{error,_}.
+-spec stop(pid(),integer(),boolean(),timeout()) -> {ok,{integer(),integer()}}|{error,_}.
 stop(Pid, Version, Abort, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), ?IS_BOOLEAN(Abort) ->
     stop(Pid, Version, Abort, [?NDB_MGM_NODE_TYPE_NDB], Timeout).
 
--spec stop(pid(),integer(),integer(),[integer()],timeout()) -> {ok,{integer(),integer()}}|{error,_}.
+-spec stop(pid(),integer(),boolean(),[integer()],timeout()) -> {ok,{integer(),integer()}}|{error,_}.
 stop(Pid, Version, Abort, Types, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), ?IS_BOOLEAN(Abort), is_list(Types) ->
     %%
@@ -286,7 +286,7 @@ stop(Pid, Version, Abort, Types, Timeout)
     call(Pid,
          <<"stop all">>, % v2
          [
-          {<<"abort">>, integer_to_binary(Abort)},
+          {<<"abort">>, boolean_to_binary(Abort)},
           {<<"stop">>, implode(F,Types,<<",">>)}
          ],
          [
@@ -299,7 +299,7 @@ stop(Pid, Version, Abort, Types, Timeout)
          fun(B,P) -> {L,[]} = parse(B,P), get_result(L,[<<"stopped">>,<<"disconnect">>]) end,
          Timeout).
 
--spec stop(pid(),integer(),integer(),integer(),[integer()],timeout()) -> {ok,{integer(),integer()}}|{error,_}.
+-spec stop(pid(),integer(),boolean(),boolean(),[integer()],timeout()) -> {ok,{integer(),integer()}}|{error,_}.
 stop(Pid, Version, Abort, Force, Nodes, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version),
        ?IS_BOOLEAN(Abort), ?IS_BOOLEAN(Force), is_list(Nodes) ->
@@ -312,14 +312,14 @@ stop(Pid, Version, Abort, Force, Nodes, Timeout)
          fold([
                fun () when (?MIN_VERSION(Version,7,0,19) and ?MAX_VERSION(Version,7,1,0)) orelse
                            (?MIN_VERSION(Version,7,1,8)) ->
-                       {<<"force">>, integer_to_binary(Force)};
+                       {<<"force">>, boolean_to_binary(Force)};
                    () ->
                        undefined
                end
               ],
               [
                {<<"node">>, implode(fun integer_to_binary/1,Nodes,<<" ">>)},
-               {<<"abort">>, integer_to_binary(Abort)}
+               {<<"abort">>, boolean_to_binary(Abort)}
               ]),
          [
           {<<"stop reply">>, null, mandatory},
@@ -331,7 +331,7 @@ stop(Pid, Version, Abort, Force, Nodes, Timeout)
          fun(B,P) -> {L,[]} = parse(B,P), get_result(L,[<<"stopped">>,<<"disconnect">>]) end,
          Timeout).
 
--spec restart(pid(),integer(),integer(),integer(),integer(),timeout()) -> {ok,integer()}|{error,_}.
+-spec restart(pid(),integer(),boolean(),boolean(),boolean(),timeout()) -> {ok,integer()}|{error,_}.
 restart(Pid, Version, Abort, Initial, NoStart, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), ?IS_BOOLEAN(Abort),
        ?IS_BOOLEAN(Initial), ?IS_BOOLEAN(NoStart) ->
@@ -342,9 +342,9 @@ restart(Pid, Version, Abort, Initial, NoStart, Timeout)
     call(Pid,
          <<"restart all">>, % v1
          [
-          {<<"abort">>, integer_to_binary(Abort)},
-          {<<"initialstart">>, integer_to_binary(Initial)},
-          {<<"nostart">>, integer_to_binary(NoStart)}
+          {<<"abort">>, boolean_to_binary(Abort)},
+          {<<"initialstart">>, boolean_to_binary(Initial)},
+          {<<"nostart">>, boolean_to_binary(NoStart)}
          ],
          [
           {<<"restart reply">>, null, mandatory},
@@ -354,7 +354,7 @@ restart(Pid, Version, Abort, Initial, NoStart, Timeout)
          fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"restarted">>) end,
          Timeout).
 
--spec restart(pid(),integer(),integer(),integer(),integer(),integer(),[integer()],timeout())
+-spec restart(pid(),integer(),boolean(),boolean(),boolean(),boolean(),[integer()],timeout())
              -> {ok,{integer(),integer()}}|{error,_}.
 restart(Pid, Version, Abort, Initial, NoStart, Force, Nodes, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), ?IS_BOOLEAN(Abort),
@@ -368,16 +368,16 @@ restart(Pid, Version, Abort, Initial, NoStart, Force, Nodes, Timeout)
          fold([
                fun () when (?MIN_VERSION(Version,7,0,19) and ?MAX_VERSION(Version,7,1,0)) orelse
                            (?MIN_VERSION(Version,7,1,8)) ->
-                       {<<"force">>, integer_to_binary(Force)};
+                       {<<"force">>, boolean_to_binary(Force)};
                    () ->
                        undefined
                end
               ],
               [
                {<<"node">>, implode(fun integer_to_binary/1,Nodes,<<" ">>)},
-               {<<"abort">>, integer_to_binary(Abort)},
-               {<<"initialstart">>, integer_to_binary(Initial)},
-               {<<"nostart">>, integer_to_binary(NoStart)}
+               {<<"abort">>, boolean_to_binary(Abort)},
+               {<<"initialstart">>, boolean_to_binary(Initial)},
+               {<<"nostart">>, boolean_to_binary(NoStart)}
               ]),
          [
           {<<"restart reply">>, null, mandatory},
@@ -413,7 +413,7 @@ get_clusterlog_severity_filter(Pid, Timeout)
          fun(B,P) -> {L,[]} = parse(B,P), lists:keymap(fun match_event_severity/1,1,L) end,
          Timeout).
 
--spec set_clusterlog_severity_filter(pid(),integer(),integer(),timeout()) -> {ok,integer()}|{error,_}.
+-spec set_clusterlog_severity_filter(pid(),integer(),boolean(),timeout()) -> {ok,integer()}|{error,_}.
 set_clusterlog_severity_filter(Pid, Severity, Enable, Timeout)
   when is_pid(Pid), ?IS_EVENT_SEVERITY(Severity), ?IS_BOOLEAN(Enable) ->
     %%
@@ -424,7 +424,7 @@ set_clusterlog_severity_filter(Pid, Severity, Enable, Timeout)
          <<"set logfilter">>,
          [
           {<<"level">>, integer_to_binary(Severity)},
-          {<<"enable">>, integer_to_binary(Enable)}
+          {<<"enable">>, boolean_to_binary(Enable)}
          ],
          [
           {<<"set logfilter reply">>, null, mandatory},
@@ -485,7 +485,7 @@ set_clusterlog_loglevel(Pid, Node, Category, Level, Timeout)
 
 %% -- 3.2.8. Backup Functions --
 
--spec start_backup(pid(),integer(),integer(),integer(),integer(),timeout()) -> {ok,integer()}|{error,_}.
+-spec start_backup(pid(),integer(),integer(),integer(),boolean(),timeout()) -> {ok,integer()}|{error,_}.
 start_backup(Pid, Version, Completed, BackupId, Backuppoint, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version),
        ?IS_BACKUP_WAIT(Completed), ?IS_BACKUP_ID(BackupId), ?IS_BOOLEAN(Backuppoint) ->
@@ -505,7 +505,7 @@ start_backup(Pid, Version, Completed, BackupId, Backuppoint, Timeout)
                        undefined
                end,
                fun () when ?MIN_VERSION(Version,6,4,0) ->
-                       {<<"backuppoint">>, integer_to_binary(Backuppoint)};
+                       {<<"backuppoint">>, boolean_to_binary(Backuppoint)};
                    () ->
                        undefined
                end
@@ -731,26 +731,34 @@ get_configuration2(Pid, Server, Client, NodeType, Node, Timeout) ->
             {error, Reason}
     end.
 
--spec alloc_nodeid(pid(),integer(),binary(),integer(),timeout()) -> {ok,integer()}|{error,_}.
+-spec alloc_nodeid(pid(),integer(),term(),boolean(),timeout()) -> {ok,integer()}|{error,_}.
 alloc_nodeid(Pid, Node, Name, LogEvent, Timeout)
-  when is_pid(Pid), ?IS_NODE(Node), is_binary(Name), ?IS_BOOLEAN(LogEvent) ->
+  when is_pid(Pid), (0 =:= Node orelse ?IS_NODE(Node)), ?IS_BOOLEAN(LogEvent) ->
     %%
     %% @see
-    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_alloc_nodeid/4 (!=)
+    %%  ~/src/mgmapi/mgmapi.cpp: ndb_mgm_alloc_nodeid/4
     %%
     call(Pid,
          <<"get nodeid">>,
-         [
-          {<<"version">>, integer_to_binary(?NDB_VERSION_ID)},
-          {<<"nodetype">>, integer_to_binary(?NDB_MGM_NODE_TYPE_API)},
-          {<<"nodeid">>, integer_to_binary(Node)},
-          {<<"user">>, <<"mysqld">>},
-          {<<"password">>, <<"mysqld">>},
-          {<<"public key">>, <<"a public key">>},
-          {<<"endian">>, endianness()},
-          {<<"name">>, Name},
-          {<<"log_event">>, integer_to_binary(LogEvent)} % "only log last retry"?
-         ],
+         fold([
+               fun () when is_binary(Name), 0 < size(Name) ->
+                       {<<"name">>, Name};
+                   () ->
+                       undefined
+               end,
+               fun () ->
+                       {<<"log_event">>, boolean_to_binary(LogEvent)} % "only log last retry"?
+               end
+              ],
+              [
+               {<<"version">>, integer_to_binary(?NDB_VERSION_ID)},
+               {<<"nodetype">>, integer_to_binary(?NDB_MGM_NODE_TYPE_API)},
+               {<<"nodeid">>, integer_to_binary(Node)},
+               {<<"user">>, <<"mysqld">>},
+               {<<"password">>, <<"mysqld">>},
+               {<<"public key">>, <<"a public key">>},
+               {<<"endian">>, endianness()}
+              ]),
          [
           {<<"get nodeid reply">>, null, mandatory},
           {<<"error_code">>, integer, optional},
@@ -882,6 +890,9 @@ drop_nodegroup(Pid, NodeGroup, Timeout) ->
 %%   ndb_mgm_get_configuration2/4
 
 %% == internal ==
+
+boolean_to_binary(true) -> <<"1">>;
+boolean_to_binary(_) -> <<"0">>.
 
 call(Pid, Term) ->
     mgmepi_server:call(Pid, Term).
