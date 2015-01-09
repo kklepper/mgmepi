@@ -761,9 +761,9 @@ alloc_nodeid(Pid, Node, Name, LogEvent, Timeout)
               ]),
          [
           {<<"get nodeid reply">>, null, mandatory},
-          {<<"error_code">>, integer, optional},
           {<<"nodeid">>, integer, optional},
-          {<<"result">>, string, mandatory}
+          {<<"result">>, string, mandatory},
+          {<<"error_code">>, integer, optional}
          ],
          fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"nodeid">>) end,
          Timeout).
@@ -822,8 +822,8 @@ create_nodegroup(Pid, Nodes, Timeout)
          [
           {<<"create nodegroup reply">>, null, mandatory},
           {<<"ng">>, integer, mandatory},
-          {<<"error_code">>, integer, optional},
-          {<<"result">>, string, mandatory}
+          {<<"result">>, string, mandatory},
+          {<<"error_code">>, integer, optional}
          ],
          fun(B,P) -> {L,[]} = parse(B,P), get_result(L,<<"ng">>) end,
          Timeout).
@@ -843,9 +843,8 @@ drop_nodegroup(Pid, NodeGroup, Timeout) ->
          ],
          [
           {<<"drop nodegroup reply">>, null, mandatory},
-          {<<"error_code">>, integer, optional}, % ?
           {<<"result">>, string, mandatory},
-          {<<"error_code">>, integer, optional}  % !
+          {<<"error_code">>, integer, optional}
          ],
          fun(B,P) -> {L,[]} = parse(B,P), get_result(L) end,
          Timeout).
