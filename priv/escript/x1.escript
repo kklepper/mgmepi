@@ -36,7 +36,7 @@ run(1, Pid) ->
     T = timer:seconds(3),
     L = [
          {true,  fun(E) -> mgmepi_protocol:get_version(E,T) end},
-         {false, fun(E) -> mgmepi_protocol:alloc_nodeid(E,201,<<"x1">>,1,T) end},
+         {false, fun(E) -> mgmepi_protocol:alloc_nodeid(E,201,<<"x1">>,false,T) end},
          {false, fun(E) -> mgmepi_protocol:check_connection(E,T) end},
          {false, fun(E) -> mgmepi_protocol:get_status(E,T) end},
          {false, fun(E) -> mgmepi_protocol:get_status2(E,[2],T) end},
@@ -63,7 +63,7 @@ run(1, Pid) ->
          {false, fun(E) -> mgmepi_protocol:get_configuration(E,V,T) end},
          {false, fun(E) -> mgmepi_protocol:get_configuration_from_node(E,V,1,T) end},
          {false, fun(E) -> run(2,E) end},
-         {true, fun(E) -> run(3,E) end},
+         {false, fun(E) -> run(3,E) end},
          {false, fun(E) -> mgmepi_protocol:create_nodegroup(E,[2,5],T) end},
          {false, fun(E) -> mgmepi_protocol:drop_nodegroup(E,1,T) end},
          {true,  fun(E) -> mgmepi_protocol:end_session(E,T) end}

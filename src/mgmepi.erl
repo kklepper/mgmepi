@@ -23,8 +23,10 @@
 -export([start/0, start/1, stop/0, version/0]).
 -export([get_version/0, get_version/1, get_version/2,
          check_connection/0, check_connection/1, check_connection/2]).
+
+
 -export([get_config/0, get_config/1]).
--export([alloc_nodeid/3]).
+-export([alloc_nodeid/2, alloc_nodeid/3, alloc_nodeid/4, alloc_nodeid/5]).
 
 -define(TIMEOUT, 3000).
 
@@ -53,11 +55,13 @@ get_version() ->
     get_version(mgmepi_pool).
 
 -spec get_version(atom()) -> {ok,integer()}|{error,_}.
-get_version(Pool) ->
+get_version(Pool)
+  when is_atom(Pool) ->
     get_version(Pool, ?TIMEOUT).
 
 -spec get_version(atom(),timeout()) -> {ok,integer()}|{error,_}.
-get_version(Pool, Timeout) ->
+get_version(Pool, Timeout)
+  when is_atom(Pool) ->
     poolboy:transaction(Pool, fun(P) -> mgmepi_protocol:get_version(P,Timeout) end).
 
 -spec check_connection() -> ok|{error,_}.
@@ -65,13 +69,38 @@ check_connection() ->
     check_connection(mgmepi_pool).
 
 -spec check_connection(atom()) -> ok|{error,_}.
-check_connection(Pool) ->
+check_connection(Pool)
+  when is_atom(Pool) ->
     check_connection(Pool, ?TIMEOUT).
 
 -spec check_connection(atom(),timeout()) -> ok|{error,_}.
-check_connection(Pool, Timeout) ->
+check_connection(Pool, Timeout)
+  when is_atom(Pool) ->
     poolboy:transaction(Pool, fun(P) -> mgmepi_protocol:check_connection(P,Timeout) end).
 
+
+-spec alloc_nodeid(integer(),boolean()) -> {ok,integer()}|{error,_}.
+alloc_nodeid(Node, LogEvent)
+  when (0 =:= Node orelse ?IS_NODE(Node)), ?IS_BOOLEAN(LogEvent) ->
+    alloc_nodeid(Node, undefined, LogEvent).
+
+-spec alloc_nodeid(integer(),term(),boolean()) -> {ok,integer()}|{error,_}.
+alloc_nodeid(Node, Name, LogEvent)
+  when (0 =:= Node orelse ?IS_NODE(Node)), ?IS_BOOLEAN(LogEvent) ->
+    alloc_nodeid(mgmepi_pool, Node, Name, LogEvent).
+
+-spec alloc_nodeid(atom(),integer(),term(),boolean()) -> {ok,integer()}|{error,_}.
+alloc_nodeid(Pool, Node, Name, LogEvent)
+  when is_atom(Pool), (0 =:= Node orelse ?IS_NODE(Node)), ?IS_BOOLEAN(LogEvent) ->
+    alloc_nodeid(Pool, Node, Name, LogEvent, ?TIMEOUT).
+
+-spec alloc_nodeid(atom(),integer(),term(),boolean(),timeout()) -> {ok,integer()}|{error,_}.
+alloc_nodeid(Pool, Node, Name, LogEvent, Timeout)
+  when is_atom(Pool), (0 =:= Node orelse ?IS_NODE(Node)), ?IS_BOOLEAN(LogEvent) ->
+    poolboy:transaction(Pool, fun(P) -> mgmepi_protocol:alloc_nodeid(P,Node,Name,LogEvent,Timeout) end).
+
+
+%% --
 
 get_config() ->
     get_config(mgmepi_pool).
@@ -89,11 +118,3 @@ get_config(Pool) ->
             ok = poolboy:checkin(Pool, Pid),
             Result
     end.
-
-
-alloc_nodeid(Node, Name, LogEvent) ->
-    alloc_nodeid(mgmepi_pool, Node, Name, LogEvent, ?TIMEOUT).
-
-alloc_nodeid(Pool, Node, Name, LogEvent, Timeout) ->
-    F = fun(Pid) -> mgmepi_protocol:alloc_nodeid(Pid,Node,Name,LogEvent, Timeout) end,
-    poolboy:transaction(Pool, F).
