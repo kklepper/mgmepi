@@ -21,7 +21,8 @@
 
 %% -- public --
 -export([start/0, start/1, stop/0, version/0]).
--export([get_version/0, get_version/1, get_version/2]).
+-export([get_version/0, get_version/1, get_version/2,
+         check_connection/0, check_connection/1, check_connection/2]).
 -export([get_config/0, get_config/1]).
 -export([alloc_nodeid/3]).
 
@@ -58,6 +59,18 @@ get_version(Pool) ->
 -spec get_version(atom(),timeout()) -> {ok,integer()}|{error,_}.
 get_version(Pool, Timeout) ->
     poolboy:transaction(Pool, fun(P) -> mgmepi_protocol:get_version(P,Timeout) end).
+
+-spec check_connection() -> ok|{error,_}.
+check_connection() ->
+    check_connection(mgmepi_pool).
+
+-spec check_connection(atom()) -> ok|{error,_}.
+check_connection(Pool) ->
+    check_connection(Pool, ?TIMEOUT).
+
+-spec check_connection(atom(),timeout()) -> ok|{error,_}.
+check_connection(Pool, Timeout) ->
+    poolboy:transaction(Pool, fun(P) -> mgmepi_protocol:check_connection(P,Timeout) end).
 
 
 get_config() ->

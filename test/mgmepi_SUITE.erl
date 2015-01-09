@@ -31,7 +31,7 @@ groups() -> [
              {pool_v73, [], [{group, test_normal}]},
 
              {test_normal, [], [
-                                get_version_test
+                                check_connection_test
                                ]}
             ].
 
@@ -73,14 +73,11 @@ version_test(_Config) ->
 
 %% -- group: test_normal --
 
-get_version_test(Config) ->
-    get_version_test(Config, ?config(version,Config)).
-
-get_version_test(_Config, Version)
-  when ?NDB_VERSION_ID < Version ->
-    {skip, max_version};
-get_version_test(_Config, _Version) ->
-    ok.
+check_connection_test(_Config) ->
+    X = [
+         { [], ok }
+        ],
+    [ E = test(check_connection,A) || {A,E} <- X ].
 
 %% == other ==
 
