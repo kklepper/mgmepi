@@ -21,6 +21,7 @@
 
 %% -- public --
 -export([start/0, start/1, stop/0, version/0]).
+-export([get_version/0, get_version/1, get_version/2]).
 -export([get_config/0, get_config/1]).
 -export([alloc_nodeid/3]).
 
@@ -44,6 +45,19 @@ stop() ->
 -spec version() -> [non_neg_integer()].
 version() ->
     baseline_app:version(?MODULE).
+
+
+-spec get_version() -> {ok,integer()}|{error,_}.
+get_version() ->
+    get_version(mgmepi_pool).
+
+-spec get_version(atom()) -> {ok,integer()}|{error,_}.
+get_version(Pool) ->
+    get_version(Pool, ?TIMEOUT).
+
+-spec get_version(atom(),timeout()) -> {ok,integer()}|{error,_}.
+get_version(Pool, Timeout) ->
+    poolboy:transaction(Pool, fun(P) -> mgmepi_protocol:get_version(P,Timeout) end).
 
 
 get_config() ->

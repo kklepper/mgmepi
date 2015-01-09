@@ -6,40 +6,7 @@
   {registered, [mgmepi_sup]},
   {included_applications, []},
   {applications, [kernel,stdlib]},
-  {env, [
-        ]},
   {mod, {baseline_app, [
-                        {sup, [
-                               {local, mgmepi_sup},
-                               {
-                                 {one_for_one, 10, 1},
-                                 [
-                                  {pool1,
-                                   {poolboy, start_link, [
-                                                          [
-                                                           {name, {local,mgmepi_pool}},
-                                                           {worker_module, mgmepi_server},
-                                                           {size, 0},
-                                                           {max_overflow, 3}
-                                                          ],
-                                                          [
-                                                           "localhost",
-                                                           9001,
-                                                           [
-                                                            {active, false},
-                                                            {buffer, 293976},
-                                                            {keepalive, true},
-                                                            {mode, binary},
-                                                            {packet, raw},
-                                                            {recbuf, 146988},
-                                                            {sndbuf, 146988}
-                                                           ],
-                                                           3000
-                                                          ]
-                                                         ]},
-                                   permanent, 5000, worker, [poolboy,mgmepi]}
-                                 ]
-                               }
-                              ]}
+                        %% @see ../priv/conf/*.config
                        ]}}
  ]}.

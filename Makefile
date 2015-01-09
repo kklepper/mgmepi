@@ -19,6 +19,7 @@
  ERL_OPT += -sname $(1)@localhost
  ERL_OPT += -setcookie test
  ERL_OPT += -config priv/conf/$(1)
+ ERL_OPT += -s mgmepi 
 
  PLT = .dialyzer_plt.local
 

@@ -132,7 +132,7 @@ get_version(Pid, Timeout)
           {<<"mysql_minor">>, integer, optional},
           {<<"mysql_build">>, integer, optional}
          ],
-         fun(B,P) -> {L,[]} = parse(B,P), io:format("~p~n",[L]),{ok,get_value(<<"id">>,L)} end,
+         fun(B,P) -> {L,[]} = parse(B,P), {ok,get_value(<<"id">>,L)} end,
          Timeout).
 
 -spec check_connection(pid(),timeout()) -> ok|{error,_}.

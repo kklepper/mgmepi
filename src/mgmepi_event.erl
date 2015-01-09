@@ -25,7 +25,9 @@
 %% == private ==
 
 %% @see
-%%  ~/src/mgmapi/ndb_logevent.cpp: ndb_logevent
+%%  ~/src/mgmapi/ndb_logevent.cpp: ndb_logevent_body
+%%  ~/src/kernel/bloks/dblqh/DblqhMain.cpp: logfileInitCompleteReport/1
+%%  ~/src/kernel/vm/FastScheduler.cpp: reportThreadConfigLoop/6
 
 %% -- NDB_MGM_EVENT_CATEGORY_STARTUP --
 params(?NDB_LE_NDBStartStarted) -> % INFO,1
@@ -128,13 +130,14 @@ params(?NDB_LE_LogFileInitStatus) -> % INFO,7
      {<<"total_mbytes">>, integer, mandatory},
      {<<"mbytes_done">>, integer, mandatory}
     ];
-%% params(?NDB_LE_LogFileInitCompStatus) -> % INFO,7
-%%     [
-%%      {<<"?">>, integer, mandatory},
-%%      {<<"?">>, integer, mandatory},
-%%      {<<"?">>, integer, mandatory},
-%%      {<<"?">>, integer, mandatory}
-%%     ];
+params(?NDB_LE_LogFileInitCompStatus) -> % INFO,7
+    [
+     {<<"reference">>, integer, mandatory},
+     {<<"total_log_files">>, integer, mandatory},
+     {<<"log_file_init_done">>, integer, mandatory},
+     {<<"total_log_mbytes">>, integer, mandatory},
+     {<<"log_mbytes_init_done">>, integer, mandatory}
+    ];
 params(?NDB_LE_StartReadLCP) -> % INFO,10
     [
      {<<"tableid">>, integer, mandatory},
@@ -195,14 +198,14 @@ params(?NDB_LE_JobStatistic) -> % INFO,9
     [
      {<<"mean_loop_count">>, integer, mandatory}
     ];
-%% params(?NDB_LE_ThreadConfigLoop) -> % INFO,9
-%%     [
-%%      {<<"?">>, integer, mandatory},
-%%      {<<"?">>, integer, mandatory},
-%%      {<<"?">>, integer, mandatory},
-%%      {<<"?">>, integer, mandatory},
-%%      {<<"?">>, integer, mandatory}
-%%     ];
+params(?NDB_LE_ThreadConfigLoop) -> % INFO,9
+    [
+     {<<"expired_time">>, integer, mandatory},
+     {<<"extra_constant">>, integer, mandatory},
+     {<<"exec_time">>, integer, mandatory}, % tot_exec_time / no_exec_loops
+     {<<"no_extra_loops">>, integer, mandatory},
+     {<<"extra_time">>, integer, mandatory} % tot_extra_time / no_extra_loops
+    ];
 params(?NDB_LE_SendBytesStatistic) -> % INFO,9
     [
      {<<"to_node">>, integer, mandatory},

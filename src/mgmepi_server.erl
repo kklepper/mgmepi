@@ -151,13 +151,9 @@ ready(Packet, Term, Timeout, #state{module=M,handle=H}=S) ->
 
 listen(Data, #state{module=M,handle=H,from=F,pattern=P,timeout=T}=S) ->
     case M:setopt_active(H, false) andalso M:recv(H, Data, P, T) of
-        {ok, <<>>, Handle} ->
-            true = M:setopt_active(Handle, once),
-            {noreply, S#state{handle = Handle}};
         {ok, Binary, Handle} ->
-            _ = gen_server:reply(F, Binary),
-            listen(<<>>, S#state{handle = Handle});
-        {error, timeout, Handle} ->
+            0 < size(Binary) andalso gen_server:reply(F, Binary),
+            true = M:setopt_active(Handle, once),
             {noreply, S#state{handle = Handle}};
         {error, Reason, Handle} ->
             {stop, {error,Reason}, S#state{handle = Handle}}
