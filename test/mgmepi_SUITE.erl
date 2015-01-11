@@ -5,7 +5,14 @@
 
 -include("internal.hrl").
 
--compile(export_all).
+%% -- callback: ct --
+-export([all/0,
+         groups/0, init_per_group/2, end_per_group/2]).
+
+%% -- public --
+-export([version_test/1]).
+
+-export([check_connection_test/1]).
 
 %% == callback: ct ==
 
@@ -25,42 +32,96 @@
 
 all() -> [
           version_test,
-          {group, pool_v73}
+          {group, config_v73}
          ].
 
 groups() -> [
 
-             {pool_v73, [], [{group, test_sequence}]},
+             {config_v73, [], [
+                               {group, groups_public}
+                              ]},
 
-             {test_sequence, [sequence], [
-                                          alloc_nodeid_test,
-                                          {group, test_parallel}
+             {groups_public, [parallel], [
+                                          {group, group_parallel_1}
                                          ]},
 
-             {test_parallel, [parallel], [
-                                          {group, test_parallel_1},
-                                          {group, test_parallel_2}
-                                         ]},
-
-             {test_parallel_1, [], [
-                                    check_connection_test,
-                                    alloc_nodeid_test_1
-                                   ]},
-             {test_parallel_2, [], [
-                                    check_connection_test,
-                                    alloc_nodeid_test_2
-                                   ]}
+             {group_parallel_1, [sequence], [
+                                             check_connection_test
+                                            ]}
             ].
 
 init_per_group(Group, Config) ->
-    init_per_group(Group, Config, prefix(Group,<<"pool_">>)).
+    loop(Group, Config, [
+                         {<<"config_">>, [
+                                          fun start/2
+                                         ]},
+                         {<<"group_">>, [
+                                         fun checkout/2,
+                                         fun get_version/2,
+                                         fun alloc_nodeid/2
+                                        ]}
+                        ]).
 
-init_per_group(_Group, Config, false) ->
-    Config;
-init_per_group(Group, Config, true) ->
-    ok = set_env(ct:get_config(Group,Config)),
-    ok = test(start, []),
-    case test(get_version, []) of
+end_per_group(Group, Config) ->
+    loop(Group, Config, [
+                         {<<"config_">>, [
+                                          fun stop/2
+                                         ]},
+                         {<<"group_">>, [
+                                         fun end_session/2,
+                                         fun checkin/2
+                                        ]}
+                        ]).
+
+%% == public ==
+
+version_test(_Config) ->
+    [0,1] = test(version, []).
+
+
+check_connection_test(Config) ->
+    ok = test(check_connection, [?config(pid,Config)]).
+
+%% == internal ==
+
+%% -- group --
+
+start(Group, Config) ->
+    case ok =:= set_env(ct:get_config(Group,Config)) andalso test(start,[]) of
+        ok ->
+            Config;
+        {error, Reason} ->
+            {fail, Reason}
+    end.
+
+stop(_Group, Config) ->
+    case test(stop, []) of
+        ok ->
+            Config;
+        {error, Reason} ->
+            {fail, Reason}
+    end.
+
+
+checkout(_Group, Config) ->
+    case test(checkout, []) of
+        {ok, Pid} ->
+            [{pid,Pid}|Config];
+        {error, Reason} ->
+            {skip, Reason}
+    end.
+
+checkin(_Group, Config) ->
+    case test(checkin, [?config(pid,Config)]) of
+        ok ->
+            proplists:delete(pid,Config);
+        {error, Reason} ->
+            {fail, Reason}
+    end.
+
+
+get_version(_Group, Config) ->
+    case test(get_version, [?config(pid,Config)]) of
         {ok, Version} when ?NDB_VERSION_ID < Version ->
             {skip, max_version};
         {ok, Version} when ?VERSION(7,3,0) > Version ->
@@ -71,75 +132,35 @@ init_per_group(Group, Config, true) ->
             {skip, Reason}
     end.
 
-end_per_group(Group, Config) ->
-    end_per_group(Group, Config, prefix(Group,<<"pool_">>)).
 
-end_per_group(_Group, Config, false) ->
-    Config;
-end_per_group(_Group, Config, true) ->
-    ok = test(stop, []),
-    proplists:delete(version,Config).
+alloc_nodeid(_Group, Config) ->
+    case test(alloc_nodeid, [?config(pid,Config)]) of
+        {ok, Node} ->
+            [{node,Node}|Config];
+        {error, Reason} ->
+            {skip, Reason}
+    end.
 
-init_per_testcase(Testcase, Config) ->
-    init_per_testcase(Testcase, Config, prefix(Testcase,<<"alloc_nodeid_">>)).
+end_session(_Group, Config) ->
+    case test(end_session, [?config(pid,Config)]) of
+        ok ->
+            proplists:delete(node,Config);
+        {error, Reason} ->
+            {fail, Reason}
+    end.
 
-init_per_testcase(_Testcase, Config, false) ->
-    Config;
-init_per_testcase(Testcase, Config, true) ->
-    {ok, Node} = test(alloc_nodeid, [0,atom_to_binary(Testcase,latin1),false]),
-    ct:log("alloc_nodeid=~p", [Node]),
-    [{node,Node}|Config].
+%% -- other --
 
-end_per_testcase(TestCase, Config) ->
-    end_per_testcase(TestCase, Config, ?config(node,Config)).
-
-end_per_testcase(_TestCase, Config, undefined) ->
-    Config;
-end_per_testcase(_TestCase, Config, Node) ->
-    ct:log("end_session=~p", [Node]),
-    ok = test(end_session, []),
-    proplists:delete(node,Config).
-
-%% == test ==
-
-version_test(_Config) ->
-    X = [
-         { [], [0,1] }
-        ],
-    [ E = test(version,A) || {A,E} <- X ].
-
-%% -- group: test_sequence --
-
-alloc_nodeid_test(Config) ->
-    N = ?config(node,Config),
-    X = [
-         %% {
-         %%   [0, <<"alloc_nodeid_test">>, true],
-         %%   {ok, _} !
-         %% }
-         {
-           [N, true],
-           {error, list_to_binary([
-                                   "Id ",
-                                   integer_to_list(N),
-                                   " already allocated by another node."
-                                  ])}
-         }
-        ],
-    [ E = test(alloc_nodeid,A) || {A,E} <- X ].
-
-%% -- group: test_parallel_* --
-
-alloc_nodeid_test_1(Config) ->
-    undefined =/= ?config(node, Config).
-
-alloc_nodeid_test_2(Config) ->
-    undefined =/= ?config(node, Config).
-
-check_connection_test(_Config) ->
-    ok = test(check_connection, []).
-
-%% == other ==
+loop(_G, C, []) ->
+    C;
+loop(G, C, [{P,L}|T]) ->
+    X = case prefix(G, P) of
+            true ->
+                lists:foldl(fun(E,A) -> E(G,A) end, C, L);
+            false ->
+                C
+        end,
+    loop(G, X, T).
 
 prefix(Atom, Binary) ->
     B = atom_to_binary(Atom,latin1),

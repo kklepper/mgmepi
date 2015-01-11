@@ -30,4 +30,6 @@
                           and (?NDB_MGM_NODE_TYPE_MIN =< T)
                           and (?NDB_MGM_NODE_TYPE_MAX >  T))).
 
+-define(IS_TIMEOUT(T), (infinity =:= T orelse (is_integer(T) and (0 < T)))).
+
 -define(IS_VERSION(T), (is_integer(T))). % > 5.1 (restart:V2)
