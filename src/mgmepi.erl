@@ -28,9 +28,11 @@
          check_connection/1, check_connection/2]).
 -export([alloc_nodeid/1, alloc_nodeid/2, alloc_nodeid/3, alloc_nodeid/4, alloc_nodeid/5,
          end_session/1, end_session/2]).
--export([get_configuration/2, get_configuration/3]).
 
--export([get_config/0, get_config/1]).
+-export([get_configuration/2, get_configuration/3,
+         get_configuration_from_node/3, get_configuration_from_node/4]).
+
+-export([get_config/0, get_config/1]). % TODO, rm
 
 %% -- internal --
 -define(TIMEOUT, 3000).
@@ -155,6 +157,16 @@ get_configuration(Pid, Version)
 get_configuration(Pid, Version, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), ?IS_TIMEOUT(Timeout) ->
     mgmepi_protocol:get_configuration(Pid, Version, Timeout).
+
+-spec get_configuration_from_node(pid(),integer(),integer()) -> {ok,config()}|{error,_}.
+get_configuration_from_node(Pid, Version, Node)
+  when is_pid(Pid), ?IS_VERSION(Version), ?IS_NODE(Node) ->
+    get_configuration_from_node(Pid, Version, Node, ?TIMEOUT).
+
+-spec get_configuration_from_node(pid(),integer(),integer(),timeout()) -> {ok,config()}|{error,_}.
+get_configuration_from_node(Pid, Version, Node, Timeout)
+  when is_pid(Pid), ?IS_VERSION(Version), ?IS_NODE(Node), ?IS_TIMEOUT(Timeout) ->
+    mgmepi_protocol:get_configuration_from_node(Pid, Version, Node, Timeout).
 
 %% --
 
