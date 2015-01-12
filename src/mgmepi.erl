@@ -28,6 +28,7 @@
          check_connection/1, check_connection/2]).
 -export([alloc_nodeid/1, alloc_nodeid/2, alloc_nodeid/3, alloc_nodeid/4, alloc_nodeid/5,
          end_session/1, end_session/2]).
+-export([get_configuration/2, get_configuration/3]).
 
 -export([get_config/0, get_config/1]).
 
@@ -143,6 +144,17 @@ end_session(Pid)
 end_session(Pid, Timeout)
   when is_pid(Pid), ?IS_TIMEOUT(Timeout) ->
     mgmepi_protocol:end_session(Pid, Timeout).
+
+
+-spec get_configuration(pid(),integer()) -> {ok,config()}|{error,_}.
+get_configuration(Pid, Version)
+  when is_pid(Pid), ?IS_VERSION(Version) ->
+    get_configuration(Pid, Version, ?TIMEOUT).
+
+-spec get_configuration(pid(),integer(),timeout()) -> {ok,config()}|{error,_}.
+get_configuration(Pid, Version, Timeout)
+  when is_pid(Pid), ?IS_VERSION(Version), ?IS_TIMEOUT(Timeout) ->
+    mgmepi_protocol:get_configuration(Pid, Version, Timeout).
 
 %% --
 

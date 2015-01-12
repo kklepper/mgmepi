@@ -668,7 +668,7 @@ get_event_category_string(Category)
 
 %% -- "Configuration handling" --
 
--spec get_configuration(pid(),integer(),timeout()) -> {ok,term()}|{error,_}.
+-spec get_configuration(pid(),integer(),timeout()) -> {ok,config()}|{error,_}.
 get_configuration(Pid, Version, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version) ->
     %%
