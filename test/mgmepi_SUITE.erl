@@ -10,9 +10,12 @@
          groups/0, init_per_group/2, end_per_group/2]).
 
 %% -- public --
--export([version_test/1]).
+-export([start_test/2, stop_test/2, version_test/1]).
 
--export([check_connection_test/1]).
+-export([checkout_test/2, checkin_test/2]).
+
+-export([get_version_test/2, check_connection_test/1]).
+-export([alloc_nodeid_test/1, alloc_nodeid_test/2, end_session_test/2]).
 
 %% == callback: ct ==
 
@@ -42,51 +45,49 @@ groups() -> [
                               ]},
 
              {groups_public, [parallel], [
-                                          {group, group_parallel_1}
+                                          {group, group_parallel_1},
+                                          {group, group_parallel_2},
+                                          {group, group_parallel_3}
                                          ]},
 
              {group_parallel_1, [sequence], [
                                              check_connection_test
+                                            ]},
+             {group_parallel_2, [sequence], [
+                                             check_connection_test
+                                            ]},
+             {group_parallel_3, [sequence], [
+                                             check_connection_test,
+                                             alloc_nodeid_test
                                             ]}
             ].
 
 init_per_group(Group, Config) ->
     loop(Group, Config, [
                          {<<"config_">>, [
-                                          fun start/2
+                                          fun start_test/2
                                          ]},
                          {<<"group_">>, [
-                                         fun checkout/2,
-                                         fun get_version/2,
-                                         fun alloc_nodeid/2
+                                         fun checkout_test/2,
+                                         fun get_version_test/2,
+                                         fun alloc_nodeid_test/2
                                         ]}
                         ]).
 
 end_per_group(Group, Config) ->
     loop(Group, Config, [
                          {<<"config_">>, [
-                                          fun stop/2
+                                          fun stop_test/2
                                          ]},
                          {<<"group_">>, [
-                                         fun end_session/2,
-                                         fun checkin/2
+                                         fun end_session_test/2,
+                                         fun checkin_test/2
                                         ]}
                         ]).
 
 %% == public ==
 
-version_test(_Config) ->
-    [0,1] = test(version, []).
-
-
-check_connection_test(Config) ->
-    ok = test(check_connection, [?config(pid,Config)]).
-
-%% == internal ==
-
-%% -- group --
-
-start(Group, Config) ->
+start_test(Group, Config) ->
     case ok =:= set_env(ct:get_config(Group,Config)) andalso test(start,[]) of
         ok ->
             Config;
@@ -94,7 +95,7 @@ start(Group, Config) ->
             {fail, Reason}
     end.
 
-stop(_Group, Config) ->
+stop_test(_Group, Config) ->
     case test(stop, []) of
         ok ->
             Config;
@@ -102,8 +103,12 @@ stop(_Group, Config) ->
             {fail, Reason}
     end.
 
+version_test(_Config) ->
+    [0,1] = test(version, []).
 
-checkout(_Group, Config) ->
+%% -- pool --
+
+checkout_test(_Group, Config) ->
     case test(checkout, []) of
         {ok, Pid} ->
             [{pid,Pid}|Config];
@@ -111,7 +116,7 @@ checkout(_Group, Config) ->
             {skip, Reason}
     end.
 
-checkin(_Group, Config) ->
+checkin_test(_Group, Config) ->
     case test(checkin, [?config(pid,Config)]) of
         ok ->
             proplists:delete(pid,Config);
@@ -119,8 +124,9 @@ checkin(_Group, Config) ->
             {fail, Reason}
     end.
 
+%% -- pid --
 
-get_version(_Group, Config) ->
+get_version_test(_Group, Config) ->
     case test(get_version, [?config(pid,Config)]) of
         {ok, Version} when ?NDB_VERSION_ID < Version ->
             {skip, max_version};
@@ -132,16 +138,34 @@ get_version(_Group, Config) ->
             {skip, Reason}
     end.
 
+check_connection_test(Config) ->
+    ok = test(check_connection, [?config(pid,Config)]).
 
-alloc_nodeid(_Group, Config) ->
-    case test(alloc_nodeid, [?config(pid,Config)]) of
+
+alloc_nodeid_test(Config) ->
+    P = ?config(pid,Config),
+    N = ?config(node, Config),
+    L = [
+         {
+           [P, N],
+           {error, list_to_binary([
+                                   "Id ",
+                                   integer_to_list(N),
+                                   " already allocated by another node."
+                                  ])}
+         }
+        ],
+    [ E = test(alloc_nodeid,A) || {A,E} <- L ].
+
+alloc_nodeid_test(Group, Config) ->
+    case test(alloc_nodeid, [?config(pid,Config),0,atom_to_binary(Group,latin1)]) of
         {ok, Node} ->
             [{node,Node}|Config];
         {error, Reason} ->
             {skip, Reason}
     end.
 
-end_session(_Group, Config) ->
+end_session_test(_Group, Config) ->
     case test(end_session, [?config(pid,Config)]) of
         ok ->
             proplists:delete(node,Config);
@@ -149,7 +173,7 @@ end_session(_Group, Config) ->
             {fail, Reason}
     end.
 
-%% -- other --
+%% == internal ==
 
 loop(_G, C, []) ->
     C;
