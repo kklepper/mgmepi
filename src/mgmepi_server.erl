@@ -43,8 +43,7 @@
 %% == private ==
 
 -spec start_link(proplists:proplist()) -> {ok,pid()}|{error,_}.
-start_link(Args)
-  when is_list(Args) ->
+start_link(Args) ->
     case gen_server:start_link(?MODULE, {baseline_socket,Args}, []) of
         {ok, Pid} ->
             case call(Pid, connect) of
@@ -57,19 +56,16 @@ start_link(Args)
     end.
 
 -spec stop(pid()) -> ok.
-stop(Pid)
-  when is_pid(Pid) ->
+stop(Pid) ->
     cast(Pid, stop).
 
 
 -spec call(pid(),term()) -> term().
-call(Pid, Term)
-  when is_pid(Pid) ->
+call(Pid, Term) ->
     gen_server:call(Pid, Term, infinity).
 
 -spec cast(pid(),term()) -> ok.
-cast(Pid, Term)
-  when is_pid(Pid) ->
+cast(Pid, Term) ->
     gen_server:cast(Pid, Term).
 
 %% == behaviour: gen_server ==

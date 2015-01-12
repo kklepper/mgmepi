@@ -72,18 +72,15 @@
 %%  ~/src/common/util/ConfigValues.cpp: ConfigValuesFactory::unpack/2
 
 -spec unpack(binary()) -> proplists:proplist().
-unpack(Binary)
-  when is_binary(Binary) ->
+unpack(Binary) ->
     unpack(Binary, big). % TODO
 
 -spec unpack(binary(),atom()) -> proplists:proplist().
-unpack(Binary, Endianess)
-  when is_binary(Binary), is_atom(Endianess) ->
+unpack(Binary, Endianess) ->
     unpack(Binary, Endianess, byte_size(Binary)).
 
 -spec unpack(binary(),atom(),non_neg_integer()) -> proplists:proplist().
-unpack(Binary, Endianess, Size)
-  when is_binary(Binary), is_atom(Endianess), is_integer(Size), 12 =< Size, 0 == Size rem 4 ->
+unpack(Binary, Endianess, Size) -> % 12 =< Size, 0 == Size rem 4
     M = binary:part(Binary, 0, 8),
     C = binary:decode_unsigned(binary:part(Binary,Size,-4), Endianess),
     case {M, checksum(Binary,Size-4,0)} of
@@ -91,14 +88,11 @@ unpack(Binary, Endianess, Size)
             unpack(Binary, 8, Size-12, Endianess, []);
         _ ->
             {error, eproto}
-    end;
-unpack(_Binary, _Endianess, _Size) ->
-    {error, badarg}.
+    end.
 
 
 -spec get_connection([proplists:proplist()],integer(),atom()) -> [proplists:proplist()].
-get_connection(List, Node, tcp)
-  when is_list(List), is_integer(Node) ->
+get_connection(List, Node, tcp) ->
     F = fun (L) ->
                 lists:member({?CFG_CONNECTION_NODE_1,Node}, L)
                     orelse lists:member({?CFG_CONNECTION_NODE_2,Node}, L)
