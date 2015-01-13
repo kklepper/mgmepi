@@ -187,17 +187,10 @@ loop(G, C, [{P,L}|T]) ->
     loop(G, X, T).
 
 prefix(Atom, Binary) ->
-    B = atom_to_binary(Atom,latin1),
-    prefix(B, size(B), Binary, size(Binary)).
+    baseline_ct:prefix(Atom, Binary).
 
-prefix(Term1, Size1, Term2, Size2) ->
-    Size1 >= Size2 andalso nomatch =/= binary:match(Term1, Term2, [{scope,{0,Size2}}]).
-
-set_env([]) ->
-    ok;
-set_env([{P,V}|T]) ->
-    ok = test(application, set_env, [mgmepi,P,V]),
-    set_env(T).
+set_env(List) ->
+    baseline_ct:set_env(List).
 
 test(Function, Args) ->
     test(mgmepi, Function, Args).
