@@ -62,30 +62,36 @@ version() ->
 checkout() ->
     checkout(mgmepi_pool).
 
--spec checkout(atom()) -> {ok,pid()}|{error,full}.
+-spec checkout(atom()|pid()) -> {ok,pid()}|{error,full}.
 checkout(Pool)
-  when is_atom(Pool) ->
+  when is_atom(Pool); is_pid(Pool) ->
     checkout(Pool, true).
 
--spec checkout(atom(),boolean()) -> {ok,pid()}|{error,full}.
+-spec checkout(atom()|pid(),boolean()) -> {ok,pid()}|{error,full}.
 checkout(Pool, Block)
-  when is_atom(Pool), ?IS_BOOLEAN(Block) ->
+  when is_pid(Pool), ?IS_BOOLEAN(Block) ->
     case poolboy:checkout(Pool, Block) of
         full ->
             {error, full};
         Pid ->
             {ok, Pid}
-    end.
+    end;
+checkout(Pool, Block)
+  when is_atom(Pool), ?IS_BOOLEAN(Block) ->
+    checkout(baseline_sup:find(mgmepi_sup,Pool), Block).
 
 -spec checkin(pid()) -> ok.
 checkin(Worker)
   when is_pid(Worker) ->
     checkin(mgmepi_pool, Worker).
 
--spec checkin(atom(),pid()) -> ok.
+-spec checkin(atom()|pid(),pid()) -> ok.
+checkin(Pool, Worker)
+  when is_pid(Pool), is_pid(Worker) ->
+    poolboy:checkin(Pool, Worker);
 checkin(Pool, Worker)
   when is_atom(Pool), is_pid(Worker) ->
-    poolboy:checkin(Pool, Worker).
+    checkin(baseline_sup:find(mgmepi_sup,Pool), Worker).
 
 %% -- pid --
 
