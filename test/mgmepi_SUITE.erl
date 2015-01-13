@@ -175,7 +175,7 @@ end_session_test(_Group, Config) ->
 
 %% == internal ==
 
-loop(_G, C, []) ->
+loop(_G, C, []) -> % TODO
     C;
 loop(G, C, [{P,L}|T]) ->
     X = case prefix(G, P) of
@@ -186,14 +186,6 @@ loop(G, C, [{P,L}|T]) ->
         end,
     loop(G, X, T).
 
-prefix(Atom, Binary) ->
-    baseline_ct:prefix(Atom, Binary).
-
-set_env(List) ->
-    baseline_ct:set_env(List).
-
-test(Function, Args) ->
-    test(mgmepi, Function, Args).
-
-test(Module, Function, Args) ->
-    baseline_ct:test(Module, Function, Args).
+prefix(Atom, Binary) -> baseline_ct:prefix(Atom, Binary).
+set_env(List) -> baseline_ct:set_env(List).
+test(Function, Args) -> baseline_ct:test(mgmepi, Function, Args).
