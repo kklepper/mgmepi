@@ -58,16 +58,16 @@ version() ->
 
 %% -- pool --
 
--spec checkout() -> {ok,pid()}|{error,full}.
+-spec checkout() -> {ok,pid()}|{error,_}.
 checkout() ->
     checkout(mgmepi_pool).
 
--spec checkout(atom()|pid()) -> {ok,pid()}|{error,full}.
+-spec checkout(atom()|pid()) -> {ok,pid()}|{error,_}.
 checkout(Pool)
   when is_atom(Pool); is_pid(Pool) ->
     checkout(Pool, true).
 
--spec checkout(atom()|pid(),boolean()) -> {ok,pid()}|{error,full}.
+-spec checkout(atom()|pid(),boolean()) -> {ok,pid()}|{error,_}.
 checkout(Pool, Block)
   when is_pid(Pool), ?IS_BOOLEAN(Block) ->
     case poolboy:checkout(Pool, Block) of
@@ -78,20 +78,30 @@ checkout(Pool, Block)
     end;
 checkout(Pool, Block)
   when is_atom(Pool), ?IS_BOOLEAN(Block) ->
-    checkout(baseline_sup:find(mgmepi_sup,Pool), Block).
+    case baseline_sup:find(mgmepi_sup, Pool) of
+        undefined ->
+            {error, badarg};
+        Pid ->
+            checkout(Pid, Block)
+    end.
 
--spec checkin(pid()) -> ok.
+-spec checkin(pid()) -> ok|{error,_}.
 checkin(Worker)
   when is_pid(Worker) ->
     checkin(mgmepi_pool, Worker).
 
--spec checkin(atom()|pid(),pid()) -> ok.
+-spec checkin(atom()|pid(),pid()) -> ok|{error,_}.
 checkin(Pool, Worker)
   when is_pid(Pool), is_pid(Worker) ->
     poolboy:checkin(Pool, Worker);
 checkin(Pool, Worker)
   when is_atom(Pool), is_pid(Worker) ->
-    checkin(baseline_sup:find(mgmepi_sup,Pool), Worker).
+    case baseline_sup:find(mgmepi_sup, Pool) of
+        undefined ->
+            {error, badarg};
+        Pid ->
+            checkin(Pid, Worker)
+    end.
 
 %% -- pid --
 
