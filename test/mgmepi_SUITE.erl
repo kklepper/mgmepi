@@ -186,6 +186,6 @@ loop(G, C, [{P,L}|T]) ->
         end,
     loop(G, X, T).
 
-prefix(Atom, Binary) -> baseline_ct:prefix(Atom, Binary).
+prefix(Atom, Binary) -> baseline_binary:prefix(atom_to_binary(Atom,latin1), Binary).
 set_env(List) -> baseline_ct:set_env(List).
 test(Function, Args) -> baseline_ct:test(mgmepi, Function, Args).
