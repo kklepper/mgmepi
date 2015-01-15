@@ -21,7 +21,7 @@
 
 %% -- private --
 -export([unpack/1, unpack/2, unpack/3]).
--export([get_connection/3]).
+-export([get_connection/2, get_connection/3]).
 
 -export([config/2]). % TODO
 
@@ -90,14 +90,17 @@ unpack(Binary, Endianess, Size) -> % 12 =< Size, 0 == Size rem 4
             {error, eproto}
     end.
 
+-spec get_connection([proplists:proplist()],integer()) -> [proplists:proplist()].
+get_connection(List, Node) ->
+    get_connection(List, Node, ?CONNECTION_TYPE_TCP).
 
--spec get_connection([proplists:proplist()],integer(),atom()) -> [proplists:proplist()].
-get_connection(List, Node, tcp) ->
+-spec get_connection([proplists:proplist()],integer(),integer()) -> [proplists:proplist()].
+get_connection(List, Node, Type) ->
     F = fun (L) ->
                 lists:member({?CFG_CONNECTION_NODE_1,Node}, L)
                     orelse lists:member({?CFG_CONNECTION_NODE_2,Node}, L)
         end,
-    filter(List, ?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_TCP, F). % unzup?, TODO
+    filter(List, ?CFG_SECTION_CONNECTION, Type, F).
 
 %% === internal ===
 
