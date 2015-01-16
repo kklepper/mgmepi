@@ -32,8 +32,6 @@
 -export([get_configuration/2, get_configuration/3,
          get_configuration_from_node/3, get_configuration_from_node/4]).
 
--export([get_config/0, get_config/1]). % TODO, rm
-
 %% -- internal --
 -define(TIMEOUT, 3000).
 
@@ -183,22 +181,3 @@ get_configuration_from_node(Pid, Version, Node)
 get_configuration_from_node(Pid, Version, Node, Timeout)
   when is_pid(Pid), ?IS_VERSION(Version), ?IS_NODE(Node), ?IS_TIMEOUT(Timeout) ->
     mgmepi_protocol:get_configuration_from_node(Pid, Version, Node, Timeout).
-
-%% --
-
-get_config() ->
-    get_config(mgmepi_pool).
-
-get_config(Pool) ->
-    case poolboy:checkout(Pool) of
-        Pid ->
-            Result = case mgmepi_protocol:get_version(Pid, ?TIMEOUT) of
-                         {ok, Version} ->
-                             case mgmepi_protocol:get_configuration(Pid, Version, ?TIMEOUT) of
-                                 {ok, Config} ->
-                                     mgmepi_config:get_connection(Config, 201, tcp)
-                             end
-                     end,
-            ok = poolboy:checkin(Pool, Pid),
-            Result
-    end.

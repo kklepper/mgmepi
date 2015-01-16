@@ -23,13 +23,11 @@
 -export([unpack/1, unpack/2, unpack/3]).
 -export([get_connection/2, get_connection/3]).
 
--export([config/2]). % TODO
+-export([config/2]).
 
 %% -- internal --
 
 %% -- ~/include/mgmapi/mgmapi_config_parameters.h --
-
--define(CFG_DB_STOP_ON_ERROR_INSERT, 1). % ?
 
 -define(CFG_TYPE_OF_SECTION,     999).
 -define(CFG_SECTION_SYSTEM,     1000).
@@ -41,9 +39,9 @@
 -define(NODE_TYPE_MGM, ?NDB_MGM_NODE_TYPE_MGM).
 
 -define(CONNECTION_TYPE_TCP, 0).
-%%efine(CONNECTION_TYPE_SHM, 1).
-%%efine(CONNECTION_TYPE_SCI, 2).
-%%efine(CONNECTION_TYPE_OSE, 3).
+-define(CONNECTION_TYPE_SHM, 1).
+-define(CONNECTION_TYPE_SCI, 2).
+-define(CONNECTION_TYPE_OSE, 3).
 
 %%efine(ARBIT_METHOD_DISABLED,     0).
 %%efine(ARBIT_METHOD_DEFAULT,      1).
@@ -98,7 +96,7 @@ get_connection(List, Node) ->
 get_connection(List, Node, Type) ->
     F = fun (L) ->
                 lists:member({?CFG_CONNECTION_NODE_1,Node}, L)
-                    orelse lists:member({?CFG_CONNECTION_NODE_2,Node}, L)
+                    orelse lists:member({?CFG_CONNECTION_NODE_2,Node}, L) % TODO
         end,
     filter(List, ?CFG_SECTION_CONNECTION, Type, F).
 
@@ -175,264 +173,278 @@ zip(Previous, [{Section,K,V}|T], List1, List2) ->
 
 %% ---
 
+%%
 %% @see
 %%  ~/src/mgmsrv/ConfigInfo.cpp
-
+%%
 config(?CFG_SECTION_SYSTEM, ?CFG_SECTION_SYSTEM) ->
     [
-     {?CFG_SYS_NAME, str, <<"Name">>},
-     {?CFG_SYS_PRIMARY_MGM_NODE, int, <<"PrimaryMGMNode">>},
-     {?CFG_SYS_CONFIG_GENERATION, int, <<"ConfigGenerationNumber">>}
-    ];
-config(?CFG_SECTION_NODE, ?NODE_TYPE_DB) ->
-    %% http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-ndbd-definition.html
-    [
-     %% -- Identifying data nodes --
-     {?CFG_NODE_ID, int, <<"NodeId">>},
-     {-1, str, <<"ExecuteOnComputer">>},
-     {?CFG_NODE_HOST, str, <<"HostName">>},
-     {-1, int, <<"ServerPort">>},
-     {?CFG_TCP_BIND_INADDR_ANY, int, <<"TcpBind_INADDR_ANY">>},
-     {?CFG_DB_NODEGROUP, int, <<"NodeGroup">>},
-     {?CFG_DB_NO_REPLICAS, int, <<"NoOfReplicas">>},
-     {?CFG_NODE_DATADIR, str, <<"DataDir">>},
-     {?CFG_DB_FILESYSTEM_PATH, str, <<"FileSystemPath">>},
-     {?CFG_DB_BACKUP_DATADIR, str, <<"BackupDataDir">>},
-     %% -- Data Memory, Index Memory, and String Memory --
-     {?CFG_DB_DATA_MEM, int, <<"DataMemory">>},
-     {?CFG_DB_INDEX_MEM, int, <<"IndexMemory">>},
-     {?CFG_DB_STRING_MEMORY, int, <<"StringMemory">>},
-     {?CFG_DB_FREE_PCT, int, <<"MinFreePct">>},
-     %% -- Transaction parameters --
-     {?CFG_DB_NO_TRANSACTIONS, int, <<"MaxNoOfConcurrentTransactions">>},
-     {?CFG_DB_NO_OPS, int, <<"MaxNoOfConcurrentOperations">>},
-     {?CFG_DB_NO_LOCAL_OPS, int, <<"MaxNoOfLocalOperations">>},
-     {?CFG_DB_MAX_DML_OPERATIONS_PER_TRANSACTION, int, <<"MaxDMLOperationsPerTransaction">>},
-     %% -- Transaction temporary storage --
-     {?CFG_DB_NO_INDEX_OPS, int, <<"MaxNoOfConcurrentIndexOperations">>},
-     {?CFG_DB_NO_TRIGGER_OPS, int, <<"MaxNoOfFiredTriggers">>},
-     {?CFG_DB_TRANS_BUFFER_MEM, int, <<"TransactionBufferMemory">>},
-     %% -- Scans and buffering --
-     {?CFG_DB_NO_SCANS, int, <<"MaxNoOfConcurrentScans">>},
-     {?CFG_DB_NO_LOCAL_SCANS, int, <<"MaxNoOfLocalScans">>},
-     {?CFG_DB_BATCH_SIZE, int, <<"BatchSizePerLocalScan">>},
-     {?CFG_DB_LONG_SIGNAL_BUFFER, int, <<"LongMessageBuffer">>},
-     {?CFG_DB_PARALLEL_SCANS_PER_FRAG, int, <<"MaxParallelScansPerFragment">>},
-     %% -- Memory Allocation --
-     {?CFG_DB_MAX_ALLOCATE, int, <<"MaxAllocate">>},
-     %% -- Hash Map Size --
-     {?CFG_DEFAULT_HASHMAP_SIZE, int, <<"DefaultHashMapSize">>},
-     %% -- Logging and checkpointing --
-     {?CFG_DB_NO_REDOLOG_FILES, int, <<"NoOfFragmentLogFiles">>},
-     {?CFG_DB_REDOLOG_FILE_SIZE, int, <<"FragmentLogFileSize">>},
-     {?CFG_DB_INIT_REDO, str, <<"InitFragmentLogFiles">>},
-     {?CFG_DB_MAX_OPEN_FILES, int, <<"MaxNoOfOpenFiles">>},
-     {?CFG_DB_INITIAL_OPEN_FILES, int, <<"InitialNoOfOpenFiles">>},
-     {?CFG_DB_NO_SAVE_MSGS, int, <<"MaxNoOfSavedMessages">>},
-     {?CFG_DB_LCP_TRY_LOCK_TIMEOUT, int, <<"MaxLCPStartDelay">>},
-     %% -- Metadata objects --
-     {?CFG_DB_NO_ATTRIBUTES, int, <<"MaxNoOfAttributes">>},
-     {?CFG_DB_NO_TABLES, int, <<"MaxNoOfTables">>},
-     {?CFG_DB_NO_ORDERED_INDEXES, int, <<"MaxNoOfOrderedIndexes">>},
-     {?CFG_DB_NO_UNIQUE_HASH_INDEXES, int, <<"MaxNoOfUniqueHashIndexes">>},
-     {?CFG_DB_NO_TRIGGERS, int, <<"MaxNoOfTriggers">>},
-     {?CFG_DB_NO_INDEXES, int, <<"MaxNoOfIndexes">>}, % deprecated
-     {?CFG_DB_SUBSCRIPTIONS, int, <<"MaxNoOfSubscriptions">>},
-     {?CFG_DB_SUBSCRIBERS, int, <<"MaxNoOfSubscribers">>},
-     {?CFG_DB_SUB_OPERATIONS, int, <<"MaxNoOfConcurrentSubOperations">>},
-     %% -- Boolean parameters --
-     {?CFG_DB_MEMLOCK, int, <<"LockPagesInMainMemory">>},
-     {?CFG_DB_STOP_ON_ERROR, int, <<"StopOnError">>},
-     {?CFG_DB_CRASH_ON_CORRUPTED_TUPLE, int, <<"CrashOnCorruptedTuple">>},
-     {?CFG_DB_DISCLESS, int, <<"Diskless">>},
-     {?CFG_DB_O_DIRECT, int, <<"ODirect">>},
-     {?CFG_DB_STOP_ON_ERROR_INSERT, int, <<"RestartOnErrorInsert">>},
-     {?CFG_DB_COMPRESSED_BACKUP, int, <<"CompressedBackup">>},
-     {?CFG_DB_COMPRESSED_LCP, int, <<"CompressedLCP">>},
-     %% -- Controlling Timeouts, Intervals, and Disk Paging --
-     {?CFG_DB_WATCHDOG_INTERVAL, int, <<"TimeBetweenWatchDogCheck">>},
-     {?CFG_DB_WATCHDOG_INTERVAL_INITIAL, int, <<"TimeBetweenWatchDogCheckInitial">>},
-     {?CFG_DB_START_PARTIAL_TIMEOUT, int, <<"StartPartialTimeout">>},
-     {?CFG_DB_START_PARTITION_TIMEOUT, int, <<"StartPartitionedTimeout">>},
-     {?CFG_DB_START_FAILURE_TIMEOUT, int, <<"StartFailureTimeout">>},
-     {?CFG_DB_START_NO_NODEGROUP_TIMEOUT, int, <<"StartNoNodeGroupTimeout">>},
-     {?CFG_DB_HEARTBEAT_INTERVAL, int, <<"HeartbeatIntervalDbDb">>},
-     {?CFG_DB_API_HEARTBEAT_INTERVAL, int, <<"HeartbeatIntervalDbApi">>},
-     {?CFG_DB_HB_ORDER, int, <<"HeartbeatOrder">>},
-     {?CFG_DB_CONNECT_CHECK_DELAY, int, <<"ConnectCheckIntervalDelay">>},
-     {?CFG_DB_LCP_INTERVAL, int, <<"TimeBetweenLocalCheckpoints">>},
-     {?CFG_DB_GCP_INTERVAL, int, <<"TimeBetweenGlobalCheckpoints">>},
-     {?CFG_DB_MICRO_GCP_INTERVAL, int, <<"TimeBetweenEpochs">>},
-     {?CFG_DB_MICRO_GCP_TIMEOUT, int, <<"TimeBetweenEpochsTimeout">>},
-     {?CFG_DB_MAX_BUFFERED_EPOCHS, int, <<"MaxBufferedEpochs">>},
-     {?CFG_DB_TRANSACTION_CHECK_INTERVAL, int, <<"TimeBetweenInactiveTransactionAbortCheck">>},
-     {?CFG_DB_TRANSACTION_INACTIVE_TIMEOUT, int, <<"TransactionInactiveTimeout">>},
-     {?CFG_DB_TRANSACTION_DEADLOCK_TIMEOUT, int, <<"TransactionDeadlockDetectionTimeout">>},
-     {?CFG_DB_DISK_SYNCH_SIZE, int, <<"DiskSyncSize">>},
-     {?CFG_DB_CHECKPOINT_SPEED, int, <<"DiskCheckpointSpeed">>},
-     {?CFG_DB_CHECKPOINT_SPEED_SR, int, <<"DiskCheckpointSpeedInRestart">>},
-     {?CFG_DB_LCP_DISC_PAGES_TUP, int, <<"NoOfDiskPagesToDiskAfterRestartTUP">>},
-     {?CFG_DB_LCP_DISC_PAGES_ACC, int, <<"NoOfDiskPagesToDiskAfterRestartACC">>},
-     {?CFG_DB_LCP_DISC_PAGES_TUP_SR, int, <<"NoOfDiskPagesToDiskDuringRestartTUP">>},
-     {?CFG_DB_LCP_DISC_PAGES_ACC_SR, int, <<"NoOfDiskPagesToDiskDuringRestartACC">>},
-     {?CFG_DB_ARBIT_TIMEOUT, int, <<"ArbitrationTimeout">>},
-     {?CFG_DB_ARBIT_METHOD, str, <<"Arbitration">>},
-     %% -- Buffering and logging --
-     {?CFG_DB_UNDO_INDEX_BUFFER, int, <<"UndoIndexBuffer">>},
-     {?CFG_DB_UNDO_DATA_BUFFER, int, <<"UndoDataBuffer">>},
-     {?CFG_DB_REDO_BUFFER, int, <<"RedoBuffer">>},
-     %% -- Controlling log messages --
-     {?CFG_LOGLEVEL_STARTUP, int, <<"LogLevelStartup">>},
-     {?CFG_LOGLEVEL_SHUTDOWN, int, <<"LogLevelShutdown">>},
-     {?CFG_LOGLEVEL_STATISTICS, int, <<"LogLevelStatistic">>},
-     {?CFG_LOGLEVEL_CHECKPOINT, int, <<"LogLevelCheckpoint">>},
-     {?CFG_LOGLEVEL_NODERESTART, int, <<"LogLevelNodeRestart">>},
-     {?CFG_LOGLEVEL_CONNECTION, int, <<"LogLevelConnection">>},
-     {?CFG_LOGLEVEL_ERROR, int, <<"LogLevelError">>},
-     {?CFG_LOGLEVEL_CONGESTION, int, <<"LogLevelCongestion">>},
-     {?CFG_LOGLEVEL_INFO, int, <<"LogLevelInfo">>},
-     {?CFG_DB_MEMREPORT_FREQUENCY, int, <<"MemReportFrequency">>},
-     {?CFG_DB_STARTUP_REPORT_FREQUENCY, int, <<"StartupStatusReportFrequency">>},
-     %% -- Debugging Parameters --
-     {?CFG_DB_DICT_TRACE, int, <<"DictTrace">>},
-     %% -- Backup parameters --
-     {?CFG_DB_BACKUP_DATA_BUFFER_MEM, int, <<"BackupDataBufferSize">>},
-     {?CFG_DB_BACKUP_LOG_BUFFER_MEM, int, <<"BackupLogBufferSize">>},
-     {?CFG_DB_BACKUP_MEM, int, <<"BackupMemory">>},
-     {?CFG_DB_BACKUP_REPORT_FREQUENCY, int, <<"BackupReportFrequency">>},
-     {?CFG_DB_BACKUP_WRITE_SIZE, int, <<"BackupWriteSize">>},
-     {?CFG_DB_BACKUP_MAX_WRITE_SIZE, int, <<"BackupMaxWriteSize">>},
-     %% -- MySQL Cluster Realtime Performance Parameters --
-     {?CFG_DB_EXECUTE_LOCK_CPU, int, <<"LockExecuteThreadToCPU">>},
-     {?CFG_DB_MAINT_LOCK_CPU, int, <<"LockMaintThreadsToCPU">>},
-     {?CFG_DB_REALTIME_SCHEDULER, int, <<"RealtimeScheduler">>},
-     {?CFG_DB_SCHED_EXEC_TIME, int, <<"SchedulerExecutionTimer">>},
-     {?CFG_DB_SCHED_SPIN_TIME, int, <<"SchedulerSpinTimer">>},
-     {?CFG_DB_MT_BUILD_INDEX, int, <<"BuildIndexThreads">>},
-     {?CFG_DB_2PASS_INR, int, <<"TwoPassInitialNodeRestartCopy">>},
-     {?CFG_DB_NUMA, int, <<"Numa">>},
-     %% -- Multi-Threading Configuration Parameters (ndbmtd) --
-     {?CFG_DB_MT_THREADS, int, <<"MaxNoOfExecutionThreads">>},
-     {?CFG_DB_NO_REDOLOG_PARTS, int, <<"NoOfFragmentLogParts">>},
-     {?CFG_DB_MT_THREAD_CONFIG, str, <<"ThreadConfig">>},
-     %% -- Disk Data Configuration Parameters --
-     {?CFG_DB_DISK_PAGE_BUFFER_MEMORY, int, <<"DiskPageBufferMemory">>},
-     {?CFG_DB_SGA, int, <<"SharedGlobalMemory">>},
-     {?CFG_DB_THREAD_POOL, int, <<"DiskIOThreadPool">>},
-     %% -- Disk Data file system parameters --
-     {?CFG_DB_DD_FILESYSTEM_PATH, str, <<"FileSystemPathDD">>},
-     {?CFG_DB_DD_DATAFILE_PATH, str, <<"FileSystemPathDataFiles">>},
-     {?CFG_DB_DD_UNDOFILE_PATH, str, <<"FileSystemPathUndoFiles">>},
-     %% -- Disk Data object creation parameters --
-     {?CFG_DB_DD_LOGFILEGROUP_SPEC, str, <<"InitialLogFileGroup">>}, % InitialLogfileGroup?, TODO
-     {?CFG_DB_DD_TABLEPACE_SPEC, str, <<"InitialTablespace">>},
-     %% -- Parameters for configuring send buffer memory allocation --
-     {?CFG_RESERVED_SEND_BUFFER_MEMORY, int, <<"ReservedSendBufferMemory">>}, % deprecated
-     %% -- Redo log over-commit handling --
-     {?CFG_DB_REDO_OVERCOMMIT_COUNTER, int, <<"RedoOverCommitCounter">>},
-     {?CFG_DB_REDO_OVERCOMMIT_LIMIT, int, <<"RedoOverCommitLimit">>},
-     %% -- Controlling restart attempts --
-     {?CFG_DB_START_FAIL_DELAY_SECS, int, <<"StartFailRetryDelay">>},
-     {?CFG_DB_MAX_START_FAIL, int, <<"MaxStartFailRetries">>},
-     %% -- ? --
-     {?CFG_DB_PARALLEL_BACKUPS, int, <<"ParallelBackups">>},
-     {?CFG_MIN_LOGLEVEL, int, <<"?CFG_MIN_LOGLEVEL">>},
-     {?CFG_DB_MAX_BUFFERED_EPOCH_BYTES, int, <<"MaxBufferedEpochBytes">>},
-     {?CFG_DB_EVENTLOG_BUFFER_SIZE, int, <<"?CFG_DB_EVENTLOG_BUFFER_SIZE">>},
-     {?CFG_DB_LATE_ALLOC, int, <<"LateAlloc">>},
-     {?CFG_DB_INDEX_STAT_AUTO_CREATE, int, <<"IndexStatAutoCreate">>},
-     {?CFG_DB_INDEX_STAT_AUTO_UPDATE, int, <<"IndexStatAutoUpdate">>},
-     {?CFG_DB_INDEX_STAT_SAVE_SIZE, int, <<"IndexStatSaveSize">>},
-     {?CFG_DB_INDEX_STAT_SAVE_SCALE, int, <<"IndexStatSaveScale">>},
-     {?CFG_DB_INDEX_STAT_TRIGGER_PCT, int, <<"IndexStatTriggerPct">>},
-     {?CFG_DB_INDEX_STAT_TRIGGER_SCALE, int, <<"IndexStatTriggerScale">>},
-     {?CFG_DB_INDEX_STAT_UPDATE_DELAY, int, <<"IndexStatUpdateDelay">>}
-    ];
-config(?CFG_SECTION_NODE, ?NODE_TYPE_API) ->
-    %% http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-api-definition.html
-    [
-     {?CFG_NODE_ID, int, <<"NodeId">>},
-     { -1, str, <<"ExecuteOnComputer">>},
-     {?CFG_NODE_HOST, str, <<"HostName">>},
-     {?CFG_NODE_ARBIT_RANK, int, <<"ArbitrationRank">>},
-     {?CFG_NODE_ARBIT_DELAY, int, <<"ArbitrationDelay">>},
-     {?CFG_BATCH_BYTE_SIZE, int, <<"BatchByteSize">>},
-     {?CFG_BATCH_SIZE, int, <<"BatchSize">>},
-     {?CFG_HB_THREAD_PRIO, str, <<"HeartbeatThreadPriority">>},
-     {?CFG_MAX_SCAN_BATCH_SIZE, int, <<"MaxScanBatchSize">>},
-     {?CFG_TOTAL_SEND_BUFFER_MEMORY, int, <<"TotalSendBufferMemory">>},
-     {?CFG_AUTO_RECONNECT, int, <<"AutoReconnect">>},
-     {?CFG_DEFAULT_OPERATION_REDO_PROBLEM_ACTION, str, <<"DefaultOperationRedoProblemAction">>},
-     {?CFG_DEFAULT_HASHMAP_SIZE, int, <<"DefaultHashMapSize">>}
+     {?CFG_SYS_NAME, <<"Name">>},
+     {?CFG_SYS_PRIMARY_MGM_NODE, <<"PrimaryMGMNode">>},
+     {?CFG_SYS_CONFIG_GENERATION, <<"ConfigGenerationNumber">>}
     ];
 config(?CFG_SECTION_NODE, ?NODE_TYPE_MGM) ->
-    %% http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-mgm-definition.html
+    %%
+    %% @see
+    %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-mgm-definition.html
+    %%
     [
-     {?CFG_NODE_ID, int, <<"NodeId">>},
-     { -1, str, <<"ExecuteOnComputer">>},
-     {?CFG_MGM_PORT, int, <<"PortNumber">>},
-     {?CFG_NODE_HOST, str, <<"HostName">>},
-     {?CFG_LOG_DESTINATION, str, <<"LogDestination">>},
-     {?CFG_NODE_ARBIT_RANK, int, <<"ArbitrationRank">>},
-     {?CFG_NODE_ARBIT_DELAY, int, <<"ArbitrationDelay">>},
-     {?CFG_NODE_DATADIR, str, <<"DataDir">>},
-     {?CFG_EXTRA_SEND_BUFFER_MEMORY, int, <<"HeartbeatThreadPriority">>},
-     {?CFG_TOTAL_SEND_BUFFER_MEMORY, int, <<"TotalSendBufferMemory">>}
+     {?CFG_NODE_ID, <<"NodeId">>},
+     %%{-1, <<"ExecuteOnComputer">>},
+     {?CFG_MGM_PORT, <<"PortNumber">>},
+     {?CFG_NODE_HOST, <<"HostName">>},
+     {?CFG_LOG_DESTINATION, <<"LogDestination">>},
+     {?CFG_NODE_ARBIT_RANK, <<"ArbitrationRank">>},
+     {?CFG_NODE_ARBIT_DELAY, <<"ArbitrationDelay">>},
+     {?CFG_NODE_DATADIR, <<"DataDir">>},
+     %%{-1, <<"PortNumberStats">>},
+     %%{-1, <<"Wan">>},
+     {?CFG_HB_THREAD_PRIO, <<"HeartbeatThreadPriority">>},
+     {?CFG_TOTAL_SEND_BUFFER_MEMORY, <<"TotalSendBufferMemory">>},
+     {?CFG_MGMD_MGMD_HEARTBEAT_INTERVAL, <<"HeartbeatIntervalMgmdMgmd">>},
+     %% -- ? --
+     {?CFG_EXTRA_SEND_BUFFER_MEMORY, <<"ExtraSendBufferMemory">>}
+    ];
+config(?CFG_SECTION_NODE, ?NODE_TYPE_DB) ->
+    %%
+    %% @see
+    %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-ndbd-definition.html
+    %%
+    [
+     %% -- "Identifying data nodes" --
+     {?CFG_NODE_ID, <<"NodeId">>},
+     {?CFG_NODE_HOST, <<"HostName">>},
+     {?CFG_DB_SERVER_PORT, <<"ServerPort">>},
+     {?CFG_DB_TCPBIND_INADDR_ANY, <<"TcpBind_INADDR_ANY">>},
+     {?CFG_DB_NODEGROUP, <<"NodeGroup">>},
+     {?CFG_DB_NO_REPLICAS, <<"NoOfReplicas">>},
+     {?CFG_NODE_DATADIR, <<"DataDir">>},
+     {?CFG_DB_FILESYSTEM_PATH, <<"FileSystemPath">>},
+     {?CFG_DB_BACKUP_DATADIR, <<"BackupDataDir">>},
+     %% -- "Data Memory, Index Memory, and String Memory" --
+     {?CFG_DB_DATA_MEM, <<"DataMemory">>},
+     {?CFG_DB_INDEX_MEM, <<"IndexMemory">>},
+     {?CFG_DB_STRING_MEMORY, <<"StringMemory">>},
+     {?CFG_DB_FREE_PCT, <<"MinFreePct">>},
+     %% -- "Transaction parameters" --
+     {?CFG_DB_NO_TRANSACTIONS, <<"MaxNoOfConcurrentTransactions">>},
+     {?CFG_DB_NO_OPS, <<"MaxNoOfConcurrentOperations">>},
+     {?CFG_DB_NO_LOCAL_OPS, <<"MaxNoOfLocalOperations">>},
+     {?CFG_DB_MAX_DML_OPERATIONS_PER_TRANSACTION, <<"MaxDMLOperationsPerTransaction">>},
+     %% -- "Transaction temporary storage" --
+     {?CFG_DB_NO_INDEX_OPS, <<"MaxNoOfConcurrentIndexOperations">>},
+     {?CFG_DB_NO_TRIGGER_OPS, <<"MaxNoOfFiredTriggers">>},
+     {?CFG_DB_TRANS_BUFFER_MEM, <<"TransactionBufferMemory">>},
+     %% -- "Scans and buffering" --
+     {?CFG_DB_NO_SCANS, <<"MaxNoOfConcurrentScans">>},
+     {?CFG_DB_NO_LOCAL_SCANS, <<"MaxNoOfLocalScans">>},
+     {?CFG_DB_BATCH_SIZE, <<"BatchSizePerLocalScan">>},
+     {?CFG_DB_LONG_SIGNAL_BUFFER, <<"LongMessageBuffer">>},
+     {?CFG_DB_PARALLEL_SCANS_PER_FRAG, <<"MaxParallelScansPerFragment">>},
+     %% -- "Memory Allocation" --
+     {?CFG_DB_MAX_ALLOCATE, <<"MaxAllocate">>},
+     %% -- "Hash Map Size" --
+     {?CFG_DEFAULT_HASHMAP_SIZE, <<"DefaultHashMapSize">>},
+     %% -- "Logging and checkpointing" --
+     {?CFG_DB_NO_REDOLOG_FILES, <<"NoOfFragmentLogFiles">>},
+     {?CFG_DB_REDOLOG_FILE_SIZE, <<"FragmentLogFileSize">>},
+     {?CFG_DB_INIT_REDO, <<"InitFragmentLogFiles">>},
+     {?CFG_DB_MAX_OPEN_FILES, <<"MaxNoOfOpenFiles">>},
+     {?CFG_DB_INITIAL_OPEN_FILES, <<"InitialNoOfOpenFiles">>},
+     {?CFG_DB_NO_SAVE_MSGS, <<"MaxNoOfSavedMessages">>},
+     {?CFG_DB_LCP_TRY_LOCK_TIMEOUT, <<"MaxLCPStartDelay">>},
+     {?CFG_DB_LCP_SCAN_WATCHDOG_LIMIT, <<"LcpScanProgressTimeout">>},
+     %% -- "Metadata objects" --
+     {?CFG_DB_NO_ATTRIBUTES, <<"MaxNoOfAttributes">>},
+     {?CFG_DB_NO_TABLES, <<"MaxNoOfTables">>},
+     {?CFG_DB_NO_ORDERED_INDEXES, <<"MaxNoOfOrderedIndexes">>},
+     {?CFG_DB_NO_UNIQUE_HASH_INDEXES, <<"MaxNoOfUniqueHashIndexes">>},
+     {?CFG_DB_NO_TRIGGERS, <<"MaxNoOfTriggers">>},
+     {?CFG_DB_NO_INDEXES, <<"MaxNoOfIndexes">>}, % deprecated
+     {?CFG_DB_SUBSCRIPTIONS, <<"MaxNoOfSubscriptions">>},
+     {?CFG_DB_SUBSCRIBERS, <<"MaxNoOfSubscribers">>},
+     {?CFG_DB_SUB_OPERATIONS, <<"MaxNoOfConcurrentSubOperations">>},
+     %% -- "Boolean parameters" --
+     {?CFG_DB_LATE_ALLOC, <<"LateAlloc">>},
+     {?CFG_DB_MEMLOCK, <<"LockPagesInMainMemory">>},
+     {?CFG_DB_STOP_ON_ERROR, <<"StopOnError">>},
+     {?CFG_DB_CRASH_ON_CORRUPTED_TUPLE, <<"CrashOnCorruptedTuple">>},
+     {?CFG_DB_DISCLESS, <<"Diskless">>},
+     {?CFG_DB_O_DIRECT, <<"ODirect">>},
+     %%{?CFG_DB_STOP_ON_ERROR_INSERT, <<"RestartOnErrorInsert">>}, % internal
+     {?CFG_DB_COMPRESSED_BACKUP, <<"CompressedBackup">>},
+     {?CFG_DB_COMPRESSED_LCP, <<"CompressedLCP">>},
+     %% -- "Controlling Timeouts, Intervals, and Disk Paging" --
+     {?CFG_DB_WATCHDOG_INTERVAL, <<"TimeBetweenWatchDogCheck">>},
+     {?CFG_DB_WATCHDOG_INTERVAL_INITIAL, <<"TimeBetweenWatchDogCheckInitial">>},
+     {?CFG_DB_START_PARTIAL_TIMEOUT, <<"StartPartialTimeout">>},
+     {?CFG_DB_START_PARTITION_TIMEOUT, <<"StartPartitionedTimeout">>},
+     {?CFG_DB_START_FAILURE_TIMEOUT, <<"StartFailureTimeout">>},
+     {?CFG_DB_START_NO_NODEGROUP_TIMEOUT, <<"StartNoNodeGroupTimeout">>},
+     {?CFG_DB_HEARTBEAT_INTERVAL, <<"HeartbeatIntervalDbDb">>},
+     {?CFG_DB_API_HEARTBEAT_INTERVAL, <<"HeartbeatIntervalDbApi">>},
+     {?CFG_DB_HB_ORDER, <<"HeartbeatOrder">>},
+     {?CFG_DB_CONNECT_CHECK_DELAY, <<"ConnectCheckIntervalDelay">>},
+     {?CFG_DB_LCP_INTERVAL, <<"TimeBetweenLocalCheckpoints">>},
+     {?CFG_DB_GCP_INTERVAL, <<"TimeBetweenGlobalCheckpoints">>},
+     {?CFG_DB_MICRO_GCP_INTERVAL, <<"TimeBetweenEpochs">>},
+     {?CFG_DB_MICRO_GCP_TIMEOUT, <<"TimeBetweenEpochsTimeout">>},
+     {?CFG_DB_MAX_BUFFERED_EPOCHS, <<"MaxBufferedEpochs">>},
+     {?CFG_DB_MAX_BUFFERED_EPOCH_BYTES, <<"MaxBufferedEpochBytes">>},
+     {?CFG_DB_TRANSACTION_CHECK_INTERVAL, <<"TimeBetweenInactiveTransactionAbortCheck">>},
+     {?CFG_DB_TRANSACTION_INACTIVE_TIMEOUT, <<"TransactionInactiveTimeout">>},
+     {?CFG_DB_TRANSACTION_DEADLOCK_TIMEOUT, <<"TransactionDeadlockDetectionTimeout">>},
+     {?CFG_DB_DISK_SYNCH_SIZE, <<"DiskSyncSize">>},
+     {?CFG_DB_CHECKPOINT_SPEED, <<"DiskCheckpointSpeed">>}, % deprecated
+     {?CFG_DB_CHECKPOINT_SPEED_SR, <<"DiskCheckpointSpeedInRestart">>}, % deprecated
+     {?CFG_DB_LCP_DISC_PAGES_TUP, <<"NoOfDiskPagesToDiskAfterRestartTUP">>}, % deprecated
+     %%{-1, <<"MaxDiskWriteSpeed">>},
+     %%{-1, <<"MaxDiskWriteSpeedOtherNodeRestart">>},
+     %%{-1, <<"MaxDiskWriteSpeedOwnRestart">>},
+     %%{-1, <<"MinDiskWriteSpeed">>},
+     {?CFG_DB_LCP_DISC_PAGES_ACC, <<"NoOfDiskPagesToDiskAfterRestartACC">>}, % deprecated
+     {?CFG_DB_LCP_DISC_PAGES_TUP_SR, <<"NoOfDiskPagesToDiskDuringRestartTUP">>}, % deprecated
+     {?CFG_DB_LCP_DISC_PAGES_ACC_SR, <<"NoOfDiskPagesToDiskDuringRestartACC">>}, % deprecated
+     {?CFG_DB_ARBIT_TIMEOUT, <<"ArbitrationTimeout">>},
+     {?CFG_DB_ARBIT_METHOD, <<"Arbitration">>},
+     %% -- "Buffering and logging" --
+     {?CFG_DB_UNDO_INDEX_BUFFER, <<"UndoIndexBuffer">>},
+     {?CFG_DB_UNDO_DATA_BUFFER, <<"UndoDataBuffer">>},
+     {?CFG_DB_REDO_BUFFER, <<"RedoBuffer">>},
+     {?CFG_DB_EVENTLOG_BUFFER_SIZE, <<"EventLogBufferSize">>},
+     %% -- "Controlling log messages" --
+     {?CFG_LOGLEVEL_STARTUP, <<"LogLevelStartup">>},
+     {?CFG_LOGLEVEL_SHUTDOWN, <<"LogLevelShutdown">>},
+     {?CFG_LOGLEVEL_STATISTICS, <<"LogLevelStatistic">>},
+     {?CFG_LOGLEVEL_CHECKPOINT, <<"LogLevelCheckpoint">>},
+     {?CFG_LOGLEVEL_NODERESTART, <<"LogLevelNodeRestart">>},
+     {?CFG_LOGLEVEL_CONNECTION, <<"LogLevelConnection">>},
+     {?CFG_LOGLEVEL_ERROR, <<"LogLevelError">>},
+     {?CFG_LOGLEVEL_CONGESTION, <<"LogLevelCongestion">>},
+     {?CFG_LOGLEVEL_INFO, <<"LogLevelInfo">>},
+     {?CFG_DB_MEMREPORT_FREQUENCY, <<"MemReportFrequency">>},
+     {?CFG_DB_STARTUP_REPORT_FREQUENCY, <<"StartupStatusReportFrequency">>},
+     %% -- "Debugging Parameters" --
+     {?CFG_DB_DICT_TRACE, <<"DictTrace">>},
+     %% -- "Backup parameters" --
+     {?CFG_DB_BACKUP_DATA_BUFFER_MEM, <<"BackupDataBufferSize">>},
+     {?CFG_DB_BACKUP_LOG_BUFFER_MEM, <<"BackupLogBufferSize">>},
+     {?CFG_DB_BACKUP_MEM, <<"BackupMemory">>},
+     {?CFG_DB_BACKUP_REPORT_FREQUENCY, <<"BackupReportFrequency">>},
+     {?CFG_DB_BACKUP_WRITE_SIZE, <<"BackupWriteSize">>},
+     {?CFG_DB_BACKUP_MAX_WRITE_SIZE, <<"BackupMaxWriteSize">>},
+     %% -- "MySQL Cluster Realtime Performance Parameters" --
+     {?CFG_DB_EXECUTE_LOCK_CPU, <<"LockExecuteThreadToCPU">>},
+     {?CFG_DB_MAINT_LOCK_CPU, <<"LockMaintThreadsToCPU">>},
+     {?CFG_DB_REALTIME_SCHEDULER, <<"RealtimeScheduler">>},
+     {?CFG_DB_SCHED_EXEC_TIME, <<"SchedulerExecutionTimer">>},
+     {?CFG_DB_SCHED_SPIN_TIME, <<"SchedulerSpinTimer">>},
+     {?CFG_DB_MT_BUILD_INDEX, <<"BuildIndexThreads">>},
+     {?CFG_DB_2PASS_INR, <<"TwoPassInitialNodeRestartCopy">>},
+     {?CFG_DB_NUMA, <<"Numa">>},
+     %% -- "Multi-Threading Configuration Parameters (ndbmtd)" --
+     {?CFG_DB_MT_THREADS, <<"MaxNoOfExecutionThreads">>},
+     {?CFG_DB_NO_REDOLOG_PARTS, <<"NoOfFragmentLogParts">>},
+     {?CFG_DB_MT_THREAD_CONFIG, <<"ThreadConfig">>},
+     %% -- "Disk Data Configuration Parameters" --
+     {?CFG_DB_DISK_PAGE_BUFFER_MEMORY, <<"DiskPageBufferMemory">>},
+     {?CFG_DB_SGA, <<"SharedGlobalMemory">>},
+     {?CFG_DB_THREAD_POOL, <<"DiskIOThreadPool">>},
+     %% -- "Disk Data file system parameters" --
+     {?CFG_DB_DD_FILESYSTEM_PATH, <<"FileSystemPathDD">>},
+     {?CFG_DB_DD_DATAFILE_PATH, <<"FileSystemPathDataFiles">>},
+     {?CFG_DB_DD_UNDOFILE_PATH, <<"FileSystemPathUndoFiles">>},
+     %% -- "Disk Data object creation parameters" --
+     {?CFG_DB_DD_LOGFILEGROUP_SPEC, <<"InitialLogFileGroup">>},
+     {?CFG_DB_DD_TABLEPACE_SPEC, <<"InitialTablespace">>},
+     %% -- "Parameters for configuring send buffer memory allocation" --
+     {?CFG_EXTRA_SEND_BUFFER_MEMORY, <<"ExtraSendBufferMemory">>},
+     {?CFG_TOTAL_SEND_BUFFER_MEMORY, <<"TotalSendBufferMemory">>},
+     {?CFG_RESERVED_SEND_BUFFER_MEMORY, <<"ReservedSendBufferMemory">>}, % deprecated
+     %% -- "Redo log over-commit handling" --
+     {?CFG_DB_REDO_OVERCOMMIT_COUNTER, <<"RedoOverCommitCounter">>},
+     {?CFG_DB_REDO_OVERCOMMIT_LIMIT, <<"RedoOverCommitLimit">>},
+     %% -- "Controlling restart attempts" --
+     {?CFG_DB_START_FAIL_DELAY_SECS, <<"StartFailRetryDelay">>},
+     {?CFG_DB_MAX_START_FAIL, <<"MaxStartFailRetries">>},
+     %% -- "NDB index statistics parameters" --
+     {?CFG_DB_INDEX_STAT_AUTO_CREATE, <<"IndexStatAutoCreate">>},
+     {?CFG_DB_INDEX_STAT_AUTO_UPDATE, <<"IndexStatAutoUpdate">>},
+     {?CFG_DB_INDEX_STAT_SAVE_SIZE, <<"IndexStatSaveSize">>},
+     {?CFG_DB_INDEX_STAT_SAVE_SCALE, <<"IndexStatSaveScale">>},
+     {?CFG_DB_INDEX_STAT_TRIGGER_PCT, <<"IndexStatTriggerPct">>},
+     {?CFG_DB_INDEX_STAT_TRIGGER_SCALE, <<"IndexStatTriggerScale">>},
+     {?CFG_DB_INDEX_STAT_UPDATE_DELAY, <<"IndexStatUpdateDelay">>},
+     %% -- ? --
+     {?CFG_DB_STOP_ON_ERROR_INSERT, <<"RestartOnErrorInsert">>},
+     {?CFG_DB_PARALLEL_BACKUPS, <<"ParallelBackups">>},
+     {?CFG_DB_AT_RESTART_SUBSCRIBER_CONNECT_TIMEOUT,  <<"RestartSubscriberConnectTimeout">>}
+    ];
+config(?CFG_SECTION_NODE, ?NODE_TYPE_API) ->
+    %%
+    %% @see
+    %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-api-definition.html
+    %%
+    [
+     %%{-1, <<"ConnectionMap">>},
+     {?CFG_NODE_ID, <<"NodeId">>},
+     %%{-1, <<"ExecuteOnComputer">>},
+     {?CFG_NODE_HOST, <<"HostName">>},
+     {?CFG_NODE_ARBIT_RANK, <<"ArbitrationRank">>},
+     {?CFG_NODE_ARBIT_DELAY, <<"ArbitrationDelay">>},
+     {?CFG_BATCH_BYTE_SIZE, <<"BatchByteSize">>},
+     {?CFG_BATCH_SIZE, <<"BatchSize">>},
+     {?CFG_EXTRA_SEND_BUFFER_MEMORY, <<"ExtraSendBufferMemory">>},
+     {?CFG_HB_THREAD_PRIO, <<"HeartbeatThreadPriority">>},
+     {?CFG_MAX_SCAN_BATCH_SIZE, <<"MaxScanBatchSize">>},
+     {?CFG_TOTAL_SEND_BUFFER_MEMORY, <<"TotalSendBufferMemory">>},
+     {?CFG_AUTO_RECONNECT, <<"AutoReconnect">>},
+     {?CFG_DEFAULT_OPERATION_REDO_PROBLEM_ACTION, <<"DefaultOperationRedoProblemAction">>},
+     {?CFG_DEFAULT_HASHMAP_SIZE, <<"DefaultHashMapSize">>},
+     %%{-1, <<"Wan">>},
+     {?CFG_CONNECT_BACKOFF_MAX_TIME, <<"ConnectBackoffMaxTime">>},
+     {?CFG_START_CONNECT_BACKOFF_MAX_TIME, <<"StartConnectBackoffMaxTime">>}
     ];
 config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_TCP) ->
-    %% http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-tcp-definition.html
+    %%
+    %% @see
+    %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-tcp-definition.html
+    %%
     [
-     {?CFG_CONNECTION_NODE_1, int, <<"NodeId1">>},
-     {?CFG_CONNECTION_NODE_2, int, <<"NodeId2">>},
-     {?CFG_CONNECTION_HOSTNAME_1, str, <<"HostName1">>},
-     {?CFG_CONNECTION_HOSTNAME_2, str, <<"HostName2">>},
-     {?CFG_CONNECTION_OVERLOAD, int, <<"OverloadLimit">>},
-     {?CFG_TCP_SEND_BUFFER_SIZE, int, <<"SendBufferMemory">>},
-     {?CFG_CONNECTION_SEND_SIGNAL_ID, int, <<"SendSignalId">>},
-     {?CFG_CONNECTION_CHECKSUM, int, <<"Checksum">>},
-     {?CFG_CONNECTION_SERVER_PORT, int, <<"PortNumber">>}, % deprecated
-     {?CFG_TCP_RECEIVE_BUFFER_SIZE, int, <<"ReceiveBufferMemory">>},
-     {?CFG_TCP_RCV_BUF_SIZE, int, <<"TCP_RCV_BUF_SIZE">>},
-     {?CFG_TCP_SND_BUF_SIZE, int, <<"TCP_SND_BUF_SIZE">>},
+     {?CFG_CONNECTION_NODE_1, <<"NodeId1">>},
+     {?CFG_CONNECTION_NODE_2, <<"NodeId2">>},
+     {?CFG_CONNECTION_HOSTNAME_1, <<"HostName1">>},
+     {?CFG_CONNECTION_HOSTNAME_2, <<"HostName2">>},
+     {?CFG_CONNECTION_OVERLOAD, <<"OverloadLimit">>},
+     {?CFG_TCP_SEND_BUFFER_SIZE, <<"SendBufferMemory">>},
+     {?CFG_CONNECTION_SEND_SIGNAL_ID, <<"SendSignalId">>},
+     {?CFG_CONNECTION_CHECKSUM, <<"Checksum">>},
+     {?CFG_CONNECTION_SERVER_PORT, <<"PortNumber">>}, % OBSOLETE
+     {?CFG_TCP_RECEIVE_BUFFER_SIZE, <<"ReceiveBufferMemory">>},
+     {?CFG_TCP_RCV_BUF_SIZE, <<"TCP_RCV_BUF_SIZE">>},
+     {?CFG_TCP_SND_BUF_SIZE, <<"TCP_SND_BUF_SIZE">>},
+     {?CFG_TCP_MAXSEG_SIZE, <<"TCP_MAXSEG_SIZE">>},
+     {?CFG_TCP_BIND_INADDR_ANY, <<"TcpBind_INADDR_ANY">>},
+     %% -- ? --
+     {?CFG_CONNECTION_GROUP, <<"Group">>},
+     {?CFG_CONNECTION_NODE_ID_SERVER, <<"NodeIdServer">>},
+     {?CFG_TCP_PROXY, <<"Proxy">>}
+    ];
+config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_SHM) ->
+    [
      %%
-     {?CFG_CONNECTION_NODE_1_SYSTEM, str, <<"NodeId1_System">>},
-     {?CFG_CONNECTION_NODE_2_SYSTEM, str, <<"NodeId2_System">>},
-     {?CFG_CONNECTION_GROUP, int, <<"Group">>},
-     {?CFG_CONNECTION_NODE_ID_SERVER, int, <<"NodeIdServer">>},
-     {?CFG_TCP_PROXY, str, <<"Proxy">>},
-     {?CFG_TCP_MAXSEG_SIZE, int, <<"TCP_MAXSEG_SIZE">>}
+     %% @see
+     %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-shm-definition.html
+     %%
+    ];
+config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_SCI) ->
+    [
+     %%
+     %% @see
+     %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-sci-definition.html
+     %%
+    ];
+config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_OSE) ->
+    [
+     %% ?
     ].
-%% config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_SHM) ->
-%%     %% http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-shm-definition.html
-%%     [
-%%      {?CFG_CONNECTION_NODE_1, int, <<"NodeId1">>},
-%%      {?CFG_CONNECTION_NODE_2, int, <<"NodeId2">>},
-%%      {?CFG_CONNECTION_HOSTNAME_1, str, <<"HostName1">>},
-%%      {?CFG_CONNECTION_HOSTNAME_2, str, <<"HostName2">>},
-%%      {?CFG_SHM_KEY, int, <<"ShmKey">>},
-%%      {?CFG_SHM_BUFFER_MEM, int, <<"ShmSize">>},
-%%      {?CFG_SHM_SEND_SIGNAL_ID, int, <<"SendSignalId">>},
-%%      {?CFG_SHM_CHECKSUM, int, <<"Checksum">>},
-%%      {?CFG_SHM_SIGNUM, int, <<"SigNum">>}
-%%     ];
-%% config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_SCI) ->
-%%     %% http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-sci-definition.html
-%%     [
-%%      {?CFG_CONNECTION_NODE_1, int, <<"NodeId1">>},
-%%      {?CFG_CONNECTION_NODE_2, int, <<"NodeId2">>},
-%%      {?CFG_SCI_HOST1_ID_0, int, <<"Host1SciId0">>},
-%%      {?CFG_SCI_HOST1_ID_1, int, <<"Host1SciId1">>},
-%%      {?CFG_SCI_HOST2_ID_0, int, <<"Host2SciId0">>},
-%%      {?CFG_SCI_HOST2_ID_1, int, <<"Host2SciId1">>},
-%%      {?CFG_CONNECTION_HOSTNAME_1, str, <<"HostName1">>},
-%%      {?CFG_CONNECTION_HOSTNAME_2, str, <<"HostName2">>},
-%%      {?CFG_SCI_BUFFER_MEM, int, <<"SharedBufferSize">>},
-%%      {?CFG_SCI_SEND_LIMIT, int, <<"SendLimit">>},
-%%      {?CFG_CONNECTION_SEND_SIGNAL_ID, int, <<"SendSignalId">>},
-%%      {?CFG_CONNECTION_CHECKSUM, int, <<"Checksum">>},
-%%      {?CFG_CONNECTION_OVERLOAD, int, <<"OverloadLimit">>}
-%%     ];
-%% config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_OSE) ->
-%%     [
-%%      %% TODO
-%%     ].
