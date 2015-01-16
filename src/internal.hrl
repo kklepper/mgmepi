@@ -3,6 +3,8 @@
 
 -include("../include/mgmepi.hrl").
 
+-include_lib("baseline/include/baseline.hrl").
+
 %% == define ==
 
 -define(FS, ": ").
@@ -11,8 +13,6 @@
 -define(IS_BACKUP_ID(T), (is_integer(T) andalso (0 =< T))).
 
 -define(IS_BACKUP_WAIT(T), (is_integer(T) andalso (0 =< T) andalso (2 >= T))).
-
--define(IS_BOOLEAN(T), (true =:= T orelse false =:= T)).
 
 -define(IS_EVENT_CATEGORY(T), (is_integer(T)
                                andalso (?NDB_MGM_MIN_EVENT_CATEGORY =< T)
@@ -29,7 +29,5 @@
 -define(IS_NODE_TYPE(T), (is_integer(T)
                           andalso (?NDB_MGM_NODE_TYPE_MIN =< T)
                           andalso (?NDB_MGM_NODE_TYPE_MAX >  T))).
-
--define(IS_TIMEOUT(T), (infinity =:= T orelse (is_integer(T) andalso (0 < T)))).
 
 -define(IS_VERSION(T), (is_integer(T))). % > 5.1 (restart:V2)
