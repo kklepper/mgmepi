@@ -132,11 +132,11 @@
 -define(CFG_DB_STARTUP_REPORT_FREQUENCY,              184).
 -define(CFG_DB_NODEGROUP,                             185).
 -define(CFG_DB_MT_THREADS,                            186).
-%%efine(CFG_NDBMT_LQH_THREADS,                        187).
-%%efine(CFG_NDBMT_LQH_WORKERS,                        188).
+-define(CFG_NDBMT_LQH_THREADS,                        187).
+-define(CFG_NDBMT_LQH_WORKERS,                        188).
 -define(CFG_DB_INIT_REDO,                             189).
 -define(CFG_DB_THREAD_POOL,                           190).
-%%efine(CFG_NDBMT_CLASSIC,                            191).
+-define(CFG_NDBMT_CLASSIC,                            191).
 %%                                                    192
 -define(CFG_DB_DD_FILESYSTEM_PATH,                    193).
 -define(CFG_DB_DD_DATAFILE_PATH,                      194).
@@ -238,8 +238,8 @@
 -define(CFG_DB_FREE_PCT,                              630).
 -define(CFG_DB_LCP_SCAN_WATCHDOG_LIMIT,               631).
 -define(CFG_DB_NO_REDOLOG_PARTS,                      632).
-%%efine(CFG_DB_AT_RESTART_SKIP_INDEXES,               633).
-%%efine(CFG_DB_AT_RESTART_SKIP_FKS,                   634).
+-define(CFG_DB_AT_RESTART_SKIP_INDEXES,               633).
+-define(CFG_DB_AT_RESTART_SKIP_FKS,                   634).
 -define(CFG_DB_SERVER_PORT,                           635).
 -define(CFG_DB_TCPBIND_INADDR_ANY,                    636).
 -define(CFG_DB_AT_RESTART_SUBSCRIBER_CONNECT_TIMEOUT, 637).
