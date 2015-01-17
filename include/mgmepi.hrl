@@ -300,6 +300,6 @@
 
 %% == type ==
 
--type(config() :: [{non_neg_integer(),integer()|binary()}]).
+-type(config() :: [{non_neg_integer(),term()}]).
 
 -export_type([config/0]).

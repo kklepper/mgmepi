@@ -23,8 +23,6 @@
 -export([unpack/1, unpack/2, unpack/3]).
 -export([get_connection/2, get_connection/3]).
 
--export([config/2]).
-
 %% -- internal --
 
 %% -- ~/include/mgmapi/mgmapi_config_parameters.h --
@@ -43,13 +41,6 @@
 -define(CONNECTION_TYPE_SCI, 2).
 -define(CONNECTION_TYPE_OSE, 3).
 
-%%efine(ARBIT_METHOD_DISABLED,     0).
-%%efine(ARBIT_METHOD_DEFAULT,      1).
-%%efine(ARBIT_METHOD_WAITEXTERNAL, 2).
-
-%%efine(OPERATION_REDO_PROBLEM_ACTION_ABORT, 0).
-%%efine(OPERATION_REDO_PROBLEM_ACTION_QUEUE, 1).
-
 %% -- ~/include/util/ConfigValues.hpp --
 
 %% enum: ConfigValues::ValueType
@@ -64,61 +55,109 @@
 -define(SECTION(I), (I band (16#00003FFF bsl 14))). % KP_SECTION_(MASK|SHIFT)
 -define(TYPE(I),    ((I bsr 28) band 16#0000000F)). % KP_TYPE_(MASK|SHIFT)
 
+-define(CFV_KEY_PARENT, 16#3ffe). % KP_KEYVAL_MASK - 1
+
 %% == private ==
 
 %% @see
 %%  ~/src/common/util/ConfigValues.cpp: ConfigValuesFactory::unpack/2
 
--spec unpack(binary()) -> proplists:proplist().
+-spec unpack(binary()) -> config().
 unpack(Binary) ->
-    unpack(Binary, big). % TODO
+    unpack(Binary, byte_size(Binary)).
 
--spec unpack(binary(),atom()) -> proplists:proplist().
-unpack(Binary, Endianess) ->
-    unpack(Binary, Endianess, byte_size(Binary)).
+-spec unpack(binary(),non_neg_integer()) -> config().
+unpack(Binary, Size) ->
+    unpack(Binary, Size, big). % TODO
 
--spec unpack(binary(),atom(),non_neg_integer()) -> proplists:proplist().
-unpack(Binary, Endianess, Size) -> % 12 =< Size, 0 == Size rem 4
-    M = binary:part(Binary, 0, 8),
-    C = binary:decode_unsigned(binary:part(Binary,Size,-4), Endianess),
-    case {M, checksum(Binary,Size-4,0)} of
+-spec unpack(binary(),non_neg_integer(),atom()) -> config().
+unpack(Binary, Size, Endianness) -> % 12 =< Size, 0 == Size rem 4
+    C = baseline_binary:binary_to_word(Binary, Size, -4, Endianness),
+    case {binary:part(Binary,0,8), checksum(Binary,Size-4,0)} of
         {<<"NDBCONFV">>, C}->
-            unpack(Binary, 8, Size-12, Endianess, []);
-        _ ->
-            {error, eproto}
+            unpack(Binary, 8, Size-12, Endianness, 0, [], [])
     end.
 
--spec get_connection([proplists:proplist()],integer()) -> [proplists:proplist()].
-get_connection(List, Node) ->
-    get_connection(List, Node, ?CONNECTION_TYPE_TCP).
+-spec get_connection(config(),integer()) -> config().
+get_connection(Config, Node) ->
+    get_connection(Config, Node, false).
 
--spec get_connection([proplists:proplist()],integer(),integer()) -> [proplists:proplist()].
-get_connection(List, Node, Type) ->
-    F = fun (L) ->
-                lists:member({?CFG_CONNECTION_NODE_1,Node}, L)
-                    orelse lists:member({?CFG_CONNECTION_NODE_2,Node}, L) % TODO
+-spec get_connection(config(),integer(),boolean()) -> config().
+get_connection(Config, Node, false) ->
+    case find(Config, [0,?CFG_SECTION_CONNECTION]) of
+        List ->
+            F = fun (L) ->
+                        lists:member({?CFG_CONNECTION_NODE_1,Node}, L)
+                            orelse lists:member({?CFG_CONNECTION_NODE_2,Node}, L) % TODO
+                end,
+            lists:filter(F, List)
+    end;
+get_connection(Config, Node, true) ->
+    F = fun (E) ->
+                case lists:keyfind(?CFG_TYPE_OF_SECTION, 1, E) of
+                    {_, Type} ->
+                        combine(E, names(?CFG_SECTION_CONNECTION,Type))
+                end
         end,
-    filter(List, ?CFG_SECTION_CONNECTION, Type, F).
+    [ F(E) || E <- get_connection(Config,Node,false) ].
 
 %% === internal ===
 
-checksum(Binary, Size, Digit) ->
+checksum(Binary, Size, Digit) -> % TODO, ndbepi
     lists:foldl(fun(E,A) -> A bxor binary:decode_unsigned(E) end, Digit,
                 [ binary:part(Binary,E,4) || E <- lists:seq(0,Size-1,4) ]).
 
-filter(List, Section, Type, Fun) ->
-    case lists:keyfind(Section, 1, List) of
-        {Section, L} ->
-            [ E || E <- L, lists:member({?CFG_TYPE_OF_SECTION,Type},E), Fun(E) ]
+combine(List1, List2) ->
+    lists:filtermap(fun ({K,V}) ->
+                            case lists:keyfind(K, 1, List2) of
+                                {K, N} ->
+                                    {true, {N,V}};
+                                false ->
+                                    case lists:member(K, [
+                                                          ?CFG_TYPE_OF_SECTION,
+                                                          ?CFV_KEY_PARENT
+                                                         ]) of
+                                        false ->
+                                            {true, {K,V}};
+                                        true ->
+                                            false
+                                    end
+                            end
+                    end, List1).
+
+find(Config, List) ->
+    find(Config, Config, List).
+
+find(Config, Key, []) ->
+    case lists:keyfind(Key, 1, Config) of
+        {Key, List} ->
+            [ proplists:get_value(N,Config) || {_,N} <- List ] % TODO
+    end;
+find(Config, List, [H|T]) ->
+    case lists:keyfind(H, 1, List) of
+        {H, L} ->
+            find(Config, L, T)
     end.
 
-
-unpack(_Binary, _Pos, 0, _Endianess, [{S,_,_}|_]=L) ->
-    zip(S, L, [], []);
-unpack(Binary, Pos, Len, Endianess, List) ->
+unpack(Binary, Pos, Len, Endianess) ->
     {I, PI} = unpack_integer(Binary, Pos, Endianess),
     {V, PV} = unpack_value(?TYPE(I), Binary, PI, Endianess),
-    unpack(Binary, PV, Len-(PV-Pos), Endianess, [{?SECTION(I),?KEYVAL(I),V}|List]).
+    {
+      PV,
+      Len - (PV - Pos),
+      {?SECTION(I), ?KEYVAL(I), V}
+    }.
+
+unpack(_Binary, _Pos, 0, _Endianness, Section, L1, L2) ->
+    [{Section,L2}|L1];
+unpack(Binary, Pos, Len, Endianness, Section, L1, L2) ->
+    {P, L, T} = unpack(Binary, Pos, Len, Endianness),
+    unpack(Binary, P, L, Endianness, Section, T, L1, L2).
+
+unpack(Binary, Pos, Len, Endianness, S, {S,K,V}, L1, L2) ->
+    unpack(Binary, Pos, Len, Endianness, S, L1, [{K,V}|L2]);
+unpack(Binary, Pos, Len, Endianness, P, {N,K,V}, L1, L2) ->
+    unpack(Binary, Pos, Len, Endianness, N, [{P,L2}|L1], [{K,V}]).
 
 unpack_binary(Binary, Pos, Endianess) ->
     {L, P} = unpack_integer(Binary, Pos, Endianess),
@@ -147,43 +186,17 @@ unpack_value(?VALUETYPE_SECTION, Binary, Pos, Endianess) ->
     unpack_integer(Binary, Pos, Endianess).
 
 
-zip(List) ->
-    case lists:keyfind(0, 1, List) of
-        {0, L} ->
-            [ {S,zip(K,List)} || {S,K} <- L ]
-    end.
-
-zip(Key, List) ->
-    case lists:keyfind(Key, 1, List) of
-        {Key, V} ->
-            case lists:keyfind(?CFG_TYPE_OF_SECTION, 1, V) of
-                false ->
-                    [ zip(I,List) || {_,I} <- V ];
-                _ ->
-                    V
-            end
-    end.
-
-zip(Section, [], List1, List2) ->
-    zip([{Section,List1}|List2]);
-zip(Section, [{Section,K,V}|T], List1, List2) ->
-    zip(Section, T, [{K,V}|List1], List2);
-zip(Previous, [{Section,K,V}|T], List1, List2) ->
-    zip(Section, T, [{K,V}], [{Previous,List1}|List2]).
-
-%% ---
-
 %%
 %% @see
 %%  ~/src/mgmsrv/ConfigInfo.cpp
 %%
-config(?CFG_SECTION_SYSTEM, ?CFG_SECTION_SYSTEM) ->
+names(?CFG_SECTION_SYSTEM, ?CFG_SECTION_SYSTEM) ->
     [
      {?CFG_SYS_NAME, <<"Name">>},
      {?CFG_SYS_PRIMARY_MGM_NODE, <<"PrimaryMGMNode">>},
      {?CFG_SYS_CONFIG_GENERATION, <<"ConfigGenerationNumber">>}
     ];
-config(?CFG_SECTION_NODE, ?NODE_TYPE_MGM) ->
+names(?CFG_SECTION_NODE, ?NODE_TYPE_MGM) ->
     %%
     %% @see
     %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-mgm-definition.html
@@ -205,7 +218,7 @@ config(?CFG_SECTION_NODE, ?NODE_TYPE_MGM) ->
      %% -- ? --
      {?CFG_EXTRA_SEND_BUFFER_MEMORY, <<"ExtraSendBufferMemory">>}
     ];
-config(?CFG_SECTION_NODE, ?NODE_TYPE_DB) ->
+names(?CFG_SECTION_NODE, ?NODE_TYPE_DB) ->
     %%
     %% @see
     %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-ndbd-definition.html
@@ -378,9 +391,14 @@ config(?CFG_SECTION_NODE, ?NODE_TYPE_DB) ->
      %% -- ? --
      {?CFG_DB_STOP_ON_ERROR_INSERT, <<"RestartOnErrorInsert">>},
      {?CFG_DB_PARALLEL_BACKUPS, <<"ParallelBackups">>},
+     {?CFG_NDBMT_LQH_THREADS, <<"__ndbmt_lqh_threads">>},
+     {?CFG_NDBMT_LQH_WORKERS, <<"__ndbmt_lqh_workers">>},
+     {?CFG_NDBMT_CLASSIC, <<"__ndbmt_classic">>},
+     {?CFG_DB_AT_RESTART_SKIP_INDEXES, <<"__at_restart_skip_indexes">>},
+     {?CFG_DB_AT_RESTART_SKIP_FKS, <<"__at_restart_skip_fks">>},
      {?CFG_DB_AT_RESTART_SUBSCRIBER_CONNECT_TIMEOUT,  <<"RestartSubscriberConnectTimeout">>}
     ];
-config(?CFG_SECTION_NODE, ?NODE_TYPE_API) ->
+names(?CFG_SECTION_NODE, ?NODE_TYPE_API) ->
     %%
     %% @see
     %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-api-definition.html
@@ -405,7 +423,7 @@ config(?CFG_SECTION_NODE, ?NODE_TYPE_API) ->
      {?CFG_CONNECT_BACKOFF_MAX_TIME, <<"ConnectBackoffMaxTime">>},
      {?CFG_START_CONNECT_BACKOFF_MAX_TIME, <<"StartConnectBackoffMaxTime">>}
     ];
-config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_TCP) ->
+names(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_TCP) ->
     %%
     %% @see
     %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-tcp-definition.html
@@ -430,21 +448,21 @@ config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_TCP) ->
      {?CFG_CONNECTION_NODE_ID_SERVER, <<"NodeIdServer">>},
      {?CFG_TCP_PROXY, <<"Proxy">>}
     ];
-config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_SHM) ->
+names(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_SHM) ->
     [
      %%
      %% @see
      %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-shm-definition.html
      %%
     ];
-config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_SCI) ->
+names(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_SCI) ->
     [
      %%
      %% @see
      %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-sci-definition.html
      %%
     ];
-config(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_OSE) ->
+names(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_OSE) ->
     [
      %% ?
     ].
