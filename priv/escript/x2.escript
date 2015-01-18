@@ -22,9 +22,10 @@ main(_) ->
             {ok, Version} = mgmepi:get_version(Pid),
             case mgmepi:get_configuration(Pid, Version) of
                 {ok, List} ->
-                    io:format("~p~n", [List]),
-                    L = mgmepi_config:get_connection(List,201,true),
-                    io:format("~p~n", [L]),
+                    %% io:format("~p~n", [List]),
+                    %% io:format("~p~n", [mgmepi_config:get_system(List,true)]),
+                    %% io:format("~p~n", [mgmepi_config:get_node(List,91,true)]),
+                    io:format("~p~n", [mgmepi_config:get_connection(List,201,true)]),
                     %% case baseline_sup:start_link({{one_for_one,10,1},[]}) of
                     %%     {ok, Sup} ->
                     %%         case mgmepi:alloc_nodeid(Pid) of

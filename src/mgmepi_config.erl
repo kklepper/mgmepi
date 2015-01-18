@@ -22,6 +22,8 @@
 %% -- private --
 -export([unpack/1, unpack/2, unpack/3]).
 -export([get_connection/2, get_connection/3]).
+-export([get_node/2, get_node/3]).
+-export([get_system/1, get_system/2]).
 
 %% -- internal --
 
@@ -78,11 +80,11 @@ unpack(Binary, Size, Endianness) -> % 12 =< Size, 0 == Size rem 4
             unpack(Binary, 8, Size-12, Endianness, 0, [], [])
     end.
 
--spec get_connection(config(),integer()) -> config().
+-spec get_connection(config(),integer()) -> [config()].
 get_connection(Config, Node) ->
     get_connection(Config, Node, false).
 
--spec get_connection(config(),integer(),boolean()) -> config().
+-spec get_connection(config(),integer(),boolean()) -> [config()].
 get_connection(Config, Node, false) ->
     case find(Config, [0,?CFG_SECTION_CONNECTION]) of
         List ->
@@ -93,13 +95,33 @@ get_connection(Config, Node, false) ->
             lists:filter(F, List)
     end;
 get_connection(Config, Node, true) ->
-    F = fun (E) ->
-                case lists:keyfind(?CFG_TYPE_OF_SECTION, 1, E) of
-                    {_, Type} ->
-                        combine(E, names(?CFG_SECTION_CONNECTION,Type))
-                end
-        end,
-    [ F(E) || E <- get_connection(Config,Node,false) ].
+    [ combine(E,?CFG_SECTION_CONNECTION) || E <- get_connection(Config,Node,false) ].
+
+
+-spec get_node(config(),integer()) -> [config()].
+get_node(Config, Node) ->
+    get_node(Config, Node, false).
+
+-spec get_node(config(),integer(),boolean()) -> [config()].
+get_node(Config, Node, false) ->
+    case find(Config, [0,?CFG_SECTION_NODE]) of
+        List ->
+            F = fun (L) -> lists:member({?CFG_NODE_ID,Node}, L)  end,
+            lists:filter(F, List)
+    end;
+get_node(Config, Node, true) ->
+    [ combine(E,?CFG_SECTION_NODE) || E <- get_node(Config,Node,false) ].
+
+
+-spec get_system(config()) -> [config()].
+get_system(Config) ->
+    get_system(Config, false).
+
+-spec get_system(config(),boolean()) -> [config()].
+get_system(Config, false) ->
+    find(Config, [0,?CFG_SECTION_SYSTEM]);
+get_system(Config, true) ->
+    [ combine(E,?CFG_SECTION_SYSTEM) || E <- get_system(Config,false) ].
 
 %% === internal ===
 
@@ -107,23 +129,14 @@ checksum(Binary, Size, Digit) -> % TODO, ndbepi
     lists:foldl(fun(E,A) -> A bxor binary:decode_unsigned(E) end, Digit,
                 [ binary:part(Binary,E,4) || E <- lists:seq(0,Size-1,4) ]).
 
-combine(List1, List2) ->
-    lists:filtermap(fun ({K,V}) ->
-                            case lists:keyfind(K, 1, List2) of
-                                {K, N} ->
-                                    {true, {N,V}};
-                                false ->
-                                    case lists:member(K, [
-                                                          ?CFG_TYPE_OF_SECTION,
-                                                          ?CFV_KEY_PARENT
-                                                         ]) of
-                                        false ->
-                                            {true, {K,V}};
-                                        true ->
-                                            false
-                                    end
-                            end
-                    end, List1).
+combine(List, Section) ->
+    case lists:keyfind(?CFG_TYPE_OF_SECTION, 1, List) of
+        {_, Type} ->
+            baseline_lists:combine(List, names(Section,Type), [
+                                                               ?CFG_TYPE_OF_SECTION,
+                                                               ?CFV_KEY_PARENT
+                                                              ])
+    end.
 
 find(Config, List) ->
     find(Config, Config, List).
