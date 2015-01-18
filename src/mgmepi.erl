@@ -21,18 +21,22 @@
 
 %% -- public --
 -export([start/0, start/1, stop/0, version/0]).
-
--export([checkout/0, checkout/1, checkout/2, checkin/1, checkin/2]).
+-export([checkout/0, checkout/1, checkin/1]).
 
 -export([get_version/1, get_version/2,
          check_connection/1, check_connection/2]).
 -export([alloc_nodeid/1, alloc_nodeid/2, alloc_nodeid/3, alloc_nodeid/4, alloc_nodeid/5,
          end_session/1, end_session/2]).
-
--export([get_configuration/2, get_configuration/3,
-         get_configuration_from_node/3, get_configuration_from_node/4]).
+-export([get_configuration/2, get_configuration/3]).
 
 %% -- internal --
+-record(mgmepi, {
+          pool   :: pid(),
+          worker :: pid()
+         }).
+
+-type(mgmepi() :: #mgmepi{}).
+
 -define(TIMEOUT, 3000).
 
 %% == public ==
@@ -54,130 +58,91 @@ stop() ->
 version() ->
     baseline_app:version(?MODULE).
 
-%% -- pool --
 
--spec checkout() -> {ok,pid()}|{error,_}.
+-spec checkout() -> {ok,mgmepi()}|{error,_}.
 checkout() ->
-    checkout(mgmepi_pool).
+    checkout(false).
 
--spec checkout(atom()|pid()) -> {ok,pid()}|{error,_}.
-checkout(Pool)
-  when is_atom(Pool); is_pid(Pool) ->
-    checkout(Pool, true).
+-spec checkout(boolean()) -> {ok,mgmepi()}|{error,_}.
+checkout(Block)
+  when ?IS_BOOLEAN(Block) ->
+    checkout(Block, baseline_sup:children(mgmepi_sup)).
 
--spec checkout(atom()|pid(),boolean()) -> {ok,pid()}|{error,_}.
-checkout(Pool, Block)
-  when is_pid(Pool), ?IS_BOOLEAN(Block) ->
-    case poolboy:checkout(Pool, Block) of
+checkout(_Block, []) ->
+    {error, full};
+checkout(Block, [H|T]) ->
+    case poolboy:checkout(H, Block) of
         full ->
-            {error, full};
+            checkout(Block, T);
         Pid ->
-            {ok, Pid}
-    end;
-checkout(Pool, Block)
-  when is_atom(Pool), ?IS_BOOLEAN(Block) ->
-    case baseline_sup:find(mgmepi_sup, Pool) of
-        undefined ->
-            {error, badarg};
-        Pid ->
-            checkout(Pid, Block)
+            {ok, #mgmepi{pool = H, worker = Pid}}
     end.
 
--spec checkin(pid()) -> ok|{error,_}.
-checkin(Worker)
-  when is_pid(Worker) ->
-    checkin(mgmepi_pool, Worker).
-
--spec checkin(atom()|pid(),pid()) -> ok|{error,_}.
-checkin(Pool, Worker)
-  when is_pid(Pool), is_pid(Worker) ->
-    poolboy:checkin(Pool, Worker);
-checkin(Pool, Worker)
-  when is_atom(Pool), is_pid(Worker) ->
-    case baseline_sup:find(mgmepi_sup, Pool) of
-        undefined ->
-            {error, badarg};
-        Pid ->
-            checkin(Pid, Worker)
-    end.
-
-%% -- pid --
-
--spec get_version(pid()) -> {ok,integer()}|{error,_}.
-get_version(Pid)
-  when is_pid(Pid) ->
-    get_version(Pid, ?TIMEOUT).
-
--spec get_version(pid(),timeout()) -> {ok,integer()}|{error,_}.
-get_version(Pid, Timeout)
-  when is_pid(Pid), ?IS_TIMEOUT(Timeout) ->
-    mgmepi_protocol:get_version(Pid, Timeout).
-
--spec check_connection(pid()) -> ok|{error,_}.
-check_connection(Pid)
-  when is_pid(Pid) ->
-    check_connection(Pid, ?TIMEOUT).
-
--spec check_connection(pid(),timeout()) -> ok|{error,_}.
-check_connection(Pid, Timeout)
-  when is_pid(Pid), ?IS_TIMEOUT(Timeout) ->
-    mgmepi_protocol:check_connection(Pid, Timeout).
+-spec checkin(mgmepi()) -> ok.
+checkin(#mgmepi{pool=P,worker=W}) ->
+    poolboy:checkin(P, W).
 
 
--spec alloc_nodeid(pid()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(Pid)
-  when is_pid(Pid) ->
-    alloc_nodeid(Pid, 0).
+-spec get_version(mgmepi()) -> {ok,integer()}|{error,_}.
+get_version(#mgmepi{}=R) ->
+    get_version(R, ?TIMEOUT).
 
--spec alloc_nodeid(pid(),integer()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(Pid, Node)
-  when is_pid(Pid), (0 =:= Node orelse ?IS_NODE(Node)) ->
-    alloc_nodeid(Pid, Node, <<>>).
+-spec get_version(mgmepi(),timeout()) -> {ok,integer()}|{error,_}.
+get_version(#mgmepi{worker=W}, Timeout)
+  when is_pid(W), ?IS_TIMEOUT(Timeout) ->
+    mgmepi_protocol:get_version(W, Timeout).
 
--spec alloc_nodeid(pid(),integer(),binary()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(Pid, Node, Name)
-  when is_pid(Pid), (0 =:= Node orelse ?IS_NODE(Node)), is_binary(Name) ->
-    alloc_nodeid(Pid, Node, Name, true).
+-spec check_connection(mgmepi()) -> ok|{error,_}.
+check_connection(#mgmepi{}=R) ->
+    check_connection(R, ?TIMEOUT).
 
--spec alloc_nodeid(pid(),integer(),binary(),boolean()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(Pid, Node, Name, LogEvent)
-  when is_pid(Pid), (0 =:= Node orelse ?IS_NODE(Node)),
-       is_binary(Name), ?IS_BOOLEAN(LogEvent) ->
-    alloc_nodeid(Pid, Node, Name, LogEvent, ?TIMEOUT).
+-spec check_connection(mgmepi(),timeout()) -> ok|{error,_}.
+check_connection(#mgmepi{worker=W}, Timeout)
+  when is_pid(W), ?IS_TIMEOUT(Timeout) ->
+    mgmepi_protocol:check_connection(W, Timeout).
 
--spec alloc_nodeid(pid(),integer(),binary(),boolean(),timeout()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(Pid, Node, Name, LogEvent, Timeout)
-  when is_pid(Pid), (0 =:= Node orelse ?IS_NODE(Node)),
+
+-spec alloc_nodeid(mgmepi()) -> {ok,integer()}|{error,_}.
+alloc_nodeid(#mgmepi{}=R) ->
+    alloc_nodeid(R, 0).
+
+-spec alloc_nodeid(mgmepi(),integer()) -> {ok,integer()}|{error,_}.
+alloc_nodeid(#mgmepi{}=R, Node)
+  when (0 =:= Node orelse ?IS_NODE(Node)) ->
+    alloc_nodeid(R, Node, <<>>).
+
+-spec alloc_nodeid(mgmepi(),integer(),binary()) -> {ok,integer()}|{error,_}.
+alloc_nodeid(#mgmepi{}=R, Node, Name)
+  when (0 =:= Node orelse ?IS_NODE(Node)), is_binary(Name) ->
+    alloc_nodeid(R, Node, Name, true).
+
+-spec alloc_nodeid(mgmepi(),integer(),binary(),boolean()) -> {ok,integer()}|{error,_}.
+alloc_nodeid(#mgmepi{}=R, Node, Name, LogEvent)
+  when (0 =:= Node orelse ?IS_NODE(Node)), is_binary(Name), ?IS_BOOLEAN(LogEvent) ->
+    alloc_nodeid(R, Node, Name, LogEvent, ?TIMEOUT).
+
+-spec alloc_nodeid(mgmepi(),integer(),binary(),boolean(),timeout()) -> {ok,integer()}|{error,_}.
+alloc_nodeid(#mgmepi{worker=W}, Node, Name, LogEvent, Timeout)
+  when is_pid(W), (0 =:= Node orelse ?IS_NODE(Node)),
        is_binary(Name), ?IS_BOOLEAN(LogEvent), ?IS_TIMEOUT(Timeout) ->
-    mgmepi_protocol:alloc_nodeid(Pid, Node, Name, LogEvent, Timeout).
+    mgmepi_protocol:alloc_nodeid(W, Node, Name, LogEvent, Timeout).
 
--spec end_session(pid()) -> {ok,integer()}|{error,_}.
-end_session(Pid)
-  when is_pid(Pid) ->
-    end_session(Pid, ?TIMEOUT).
+-spec end_session(mgmepi()) -> {ok,integer()}|{error,_}.
+end_session(#mgmepi{}=R) ->
+    end_session(R, ?TIMEOUT).
 
--spec end_session(pid(),timeout()) -> {ok,integer()}|{error,_}.
-end_session(Pid, Timeout)
-  when is_pid(Pid), ?IS_TIMEOUT(Timeout) ->
-    mgmepi_protocol:end_session(Pid, Timeout).
+-spec end_session(mgmepi(),timeout()) -> {ok,integer()}|{error,_}.
+end_session(#mgmepi{worker=W}, Timeout)
+  when is_pid(W), ?IS_TIMEOUT(Timeout) ->
+    mgmepi_protocol:end_session(W, Timeout).
 
 
--spec get_configuration(pid(),integer()) -> {ok,config()}|{error,_}.
-get_configuration(Pid, Version)
-  when is_pid(Pid), ?IS_VERSION(Version) ->
-    get_configuration(Pid, Version, ?TIMEOUT).
+-spec get_configuration(mgmepi(),integer()) -> {ok,config()}|{error,_}.
+get_configuration(#mgmepi{}=R, Version)
+  when ?IS_VERSION(Version) ->
+    get_configuration(R, Version, ?TIMEOUT).
 
--spec get_configuration(pid(),integer(),timeout()) -> {ok,config()}|{error,_}.
-get_configuration(Pid, Version, Timeout)
-  when is_pid(Pid), ?IS_VERSION(Version), ?IS_TIMEOUT(Timeout) ->
-    mgmepi_protocol:get_configuration(Pid, Version, Timeout).
-
--spec get_configuration_from_node(pid(),integer(),integer()) -> {ok,config()}|{error,_}.
-get_configuration_from_node(Pid, Version, Node)
-  when is_pid(Pid), ?IS_VERSION(Version), ?IS_NODE(Node) ->
-    get_configuration_from_node(Pid, Version, Node, ?TIMEOUT).
-
--spec get_configuration_from_node(pid(),integer(),integer(),timeout()) -> {ok,config()}|{error,_}.
-get_configuration_from_node(Pid, Version, Node, Timeout)
-  when is_pid(Pid), ?IS_VERSION(Version), ?IS_NODE(Node), ?IS_TIMEOUT(Timeout) ->
-    mgmepi_protocol:get_configuration_from_node(Pid, Version, Node, Timeout).
+-spec get_configuration(mgmepi(),integer(),timeout()) -> {ok,config()}|{error,_}.
+get_configuration(#mgmepi{worker=W}, Version, Timeout)
+  when is_pid(W), ?IS_VERSION(Version), ?IS_TIMEOUT(Timeout) ->
+    mgmepi_protocol:get_configuration(W, Version, Timeout).
