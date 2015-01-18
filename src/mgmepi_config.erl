@@ -80,20 +80,18 @@ unpack(Binary, Size, Endianness) -> % 12 =< Size, 0 == Size rem 4
             unpack(Binary, 8, Size-12, Endianness, 0, [], [])
     end.
 
+
 -spec get_connection(config(),integer()) -> [config()].
 get_connection(Config, Node) ->
     get_connection(Config, Node, false).
 
 -spec get_connection(config(),integer(),boolean()) -> [config()].
 get_connection(Config, Node, false) ->
-    case find(Config, [0,?CFG_SECTION_CONNECTION]) of
-        List ->
-            F = fun (L) ->
-                        lists:member({?CFG_CONNECTION_NODE_1,Node}, L)
-                            orelse lists:member({?CFG_CONNECTION_NODE_2,Node}, L) % TODO
-                end,
-            lists:filter(F, List)
-    end;
+    F = fun (L) ->
+                lists:member({?CFG_CONNECTION_NODE_1,Node}, L)
+                    orelse lists:member({?CFG_CONNECTION_NODE_2,Node}, L) % TODO
+        end,
+    lists:filter(F, find(Config,[0,?CFG_SECTION_CONNECTION]));
 get_connection(Config, Node, true) ->
     [ combine(E,?CFG_SECTION_CONNECTION) || E <- get_connection(Config,Node,false) ].
 
@@ -104,11 +102,10 @@ get_node(Config, Node) ->
 
 -spec get_node(config(),integer(),boolean()) -> [config()].
 get_node(Config, Node, false) ->
-    case find(Config, [0,?CFG_SECTION_NODE]) of
-        List ->
-            F = fun (L) -> lists:member({?CFG_NODE_ID,Node}, L)  end,
-            lists:filter(F, List)
-    end;
+    F = fun (L) ->
+                lists:member({?CFG_NODE_ID,Node}, L)
+        end,
+    lists:filter(F, find(Config,[0,?CFG_SECTION_NODE]));
 get_node(Config, Node, true) ->
     [ combine(E,?CFG_SECTION_NODE) || E <- get_node(Config,Node,false) ].
 
@@ -152,9 +149,9 @@ find(Config, List, [H|T]) ->
             find(Config, L, T)
     end.
 
-unpack(Binary, Pos, Len, Endianess) ->
-    {I, PI} = unpack_integer(Binary, Pos, Endianess),
-    {V, PV} = unpack_value(?TYPE(I), Binary, PI, Endianess),
+unpack(Binary, Pos, Len, Endianness) ->
+    {I, PI} = unpack_integer(Binary, Pos, Endianness),
+    {V, PV} = unpack_value(?TYPE(I), Binary, PI, Endianness),
     {
       PV,
       Len - (PV - Pos),
@@ -172,8 +169,8 @@ unpack(Binary, Pos, Len, Endianness, S, {S,K,V}, L1, L2) ->
 unpack(Binary, Pos, Len, Endianness, P, {N,K,V}, L1, L2) ->
     unpack(Binary, Pos, Len, Endianness, N, [{P,L2}|L1], [{K,V}]).
 
-unpack_binary(Binary, Pos, Endianess) ->
-    {L, P} = unpack_integer(Binary, Pos, Endianess),
+unpack_binary(Binary, Pos, Endianness) ->
+    {L, P} = unpack_integer(Binary, Pos, Endianness),
     S = 4 - (L rem 4),                  % right-aligned
     {binary:part(Binary,P,L-1), P+L+S}. % ignore '\0'
 
@@ -184,19 +181,19 @@ unpack_integer(Binary, Pos, little) ->
     <<I:4/integer-signed-little-unit:8>> = binary:part(Binary, Pos, 4),
     {I, Pos+4}.
 
-unpack_long(Binary, Pos, Endianess) ->
-    {H, PH} = unpack_integer(Binary, Pos, Endianess),
-    {L, PL} = unpack_integer(Binary, PH,  Endianess),
+unpack_long(Binary, Pos, Endianness) ->
+    {H, PH} = unpack_integer(Binary, Pos, Endianness),
+    {L, PL} = unpack_integer(Binary, PH,  Endianness),
     {(H bsl 32) bor L, PL}.
 
-unpack_value(?VALUETYPE_INT, Binary, Pos, Endianess) ->
-    unpack_integer(Binary, Pos, Endianess);
-unpack_value(?VALUETYPE_STRING, Binary, Pos, Endianess) ->
-    unpack_binary(Binary, Pos, Endianess);
-unpack_value(?VALUETYPE_INT64, Binary, Pos, Endianess) ->
-    unpack_long(Binary, Pos, Endianess);
-unpack_value(?VALUETYPE_SECTION, Binary, Pos, Endianess) ->
-    unpack_integer(Binary, Pos, Endianess).
+unpack_value(?VALUETYPE_INT, Binary, Pos, Endianness) ->
+    unpack_integer(Binary, Pos, Endianness);
+unpack_value(?VALUETYPE_STRING, Binary, Pos, Endianness) ->
+    unpack_binary(Binary, Pos, Endianness);
+unpack_value(?VALUETYPE_INT64, Binary, Pos, Endianness) ->
+    unpack_long(Binary, Pos, Endianness);
+unpack_value(?VALUETYPE_SECTION, Binary, Pos, Endianness) ->
+    unpack_integer(Binary, Pos, Endianness).
 
 
 %%
