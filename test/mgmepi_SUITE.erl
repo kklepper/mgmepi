@@ -11,8 +11,7 @@
 
 %% -- public --
 -export([start_test/2, stop_test/2, version_test/1]).
-
--export([checkout_test/2, checkin_test/2]).
+-export([checkout_test/1, checkout_test/2, checkin_test/2]).
 
 -export([get_version_test/2, check_connection_test/1]).
 -export([alloc_nodeid_test/1, alloc_nodeid_test/2, end_session_test/2]).
@@ -41,6 +40,7 @@ all() -> [
 groups() -> [
 
              {config_v73, [], [
+                               checkout_test,
                                {group, groups_public}
                               ]},
 
@@ -106,28 +106,32 @@ stop_test(_Group, Config) ->
 version_test(_Config) ->
     [0,1] = test(version, []).
 
-%% -- pool --
+
+checkout_test(_Config) ->
+    L = [ test(checkout,[]) || _ <- lists:seq(1,3) ], % << priv/ct/ct.config, size=3
+    {error, full} = test(checkout,[]),
+    [ ok = test(checkin,[E]) || {ok,E} <- L ].
 
 checkout_test(_Group, Config) ->
     case test(checkout, []) of
-        {ok, Pid} ->
-            [{pid,Pid}|Config];
+        {ok, Handle} ->
+            [{handle,Handle}|Config];
         {error, Reason} ->
             {skip, Reason}
     end.
 
 checkin_test(_Group, Config) ->
-    case test(checkin, [?config(pid,Config)]) of
+    case test(checkin, [?config(handle,Config)]) of
         ok ->
-            proplists:delete(pid,Config);
+            proplists:delete(handle,Config);
         {error, Reason} ->
             {fail, Reason}
     end.
 
-%% -- pid --
+%% -- handle --
 
 get_version_test(_Group, Config) ->
-    case test(get_version, [?config(pid,Config)]) of
+    case test(get_version, [?config(handle,Config)]) of
         {ok, Version} when ?NDB_VERSION_ID < Version ->
             {skip, max_version};
         {ok, Version} when ?VERSION(7,3,0) > Version ->
@@ -139,26 +143,30 @@ get_version_test(_Group, Config) ->
     end.
 
 check_connection_test(Config) ->
-    ok = test(check_connection, [?config(pid,Config)]).
+    ok = test(check_connection, [?config(handle,Config)]).
 
 
 alloc_nodeid_test(Config) ->
-    P = ?config(pid,Config),
+    H = ?config(handle,Config),
     N = ?config(node, Config),
     L = [
          {
-           [P, N],
+           [H, N],
            {error, list_to_binary([
                                    "Id ",
                                    integer_to_list(N),
                                    " already allocated by another node."
                                   ])}
+         },
+         {
+           [H],
+           {error, <<"No free node id found for mysqld(API).">>}
          }
         ],
     [ E = test(alloc_nodeid,A) || {A,E} <- L ].
 
 alloc_nodeid_test(Group, Config) ->
-    case test(alloc_nodeid, [?config(pid,Config),0,atom_to_binary(Group,latin1)]) of
+    case test(alloc_nodeid, [?config(handle,Config),0,atom_to_binary(Group,latin1)]) of
         {ok, Node} ->
             [{node,Node}|Config];
         {error, Reason} ->
@@ -166,7 +174,7 @@ alloc_nodeid_test(Group, Config) ->
     end.
 
 end_session_test(_Group, Config) ->
-    case test(end_session, [?config(pid,Config)]) of
+    case test(end_session, [?config(handle,Config)]) of
         ok ->
             proplists:delete(node,Config);
         {error, Reason} ->
