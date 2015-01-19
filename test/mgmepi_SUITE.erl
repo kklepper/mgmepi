@@ -15,6 +15,7 @@
 
 -export([get_version_test/2, check_connection_test/1]).
 -export([alloc_nodeid_test/1, alloc_nodeid_test/2, end_session_test/2]).
+-export([get_configuration_test/1]).
 
 %% == callback: ct ==
 
@@ -51,7 +52,8 @@ groups() -> [
                                          ]},
 
              {group_parallel_1, [sequence], [
-                                             check_connection_test
+                                             check_connection_test,
+                                             get_configuration_test
                                             ]},
              {group_parallel_2, [sequence], [
                                              check_connection_test
@@ -128,7 +130,6 @@ checkin_test(_Group, Config) ->
             {fail, Reason}
     end.
 
-%% -- handle --
 
 get_version_test(_Group, Config) ->
     case test(get_version, [?config(handle,Config)]) of
@@ -181,6 +182,10 @@ end_session_test(_Group, Config) ->
             {fail, Reason}
     end.
 
+
+get_configuration_test(Config) -> % TODO
+    {ok, _} = test(get_configuration, [?config(handle,Config),?config(version,Config)]).
+
 %% == internal ==
 
 loop(_G, C, []) -> % TODO
@@ -196,4 +201,5 @@ loop(G, C, [{P,L}|T]) ->
 
 prefix(Atom, Binary) -> baseline_binary:prefix(atom_to_binary(Atom,latin1), Binary).
 set_env(List) -> baseline_ct:set_env(List).
-test(Function, Args) -> baseline_ct:test(mgmepi, Function, Args).
+test(Function, Args) -> test(mgmepi, Function, Args).
+test(Module, Function, Args) -> baseline_ct:test(Module, Function, Args).

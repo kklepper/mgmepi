@@ -39,9 +39,9 @@
 -define(NODE_TYPE_MGM, ?NDB_MGM_NODE_TYPE_MGM).
 
 -define(CONNECTION_TYPE_TCP, 0).
--define(CONNECTION_TYPE_SHM, 1).
--define(CONNECTION_TYPE_SCI, 2).
--define(CONNECTION_TYPE_OSE, 3).
+%%efine(CONNECTION_TYPE_SHM, 1).
+%%efine(CONNECTION_TYPE_SCI, 2).
+%%efine(CONNECTION_TYPE_OSE, 3).
 
 %% -- ~/include/util/ConfigValues.hpp --
 
@@ -176,10 +176,10 @@ unpack_binary(Binary, Pos, Endianness) ->
 
 unpack_integer(Binary, Pos, big) ->
     <<I:4/integer-signed-big-unit:8>> = binary:part(Binary, Pos, 4),
-    {I, Pos+4};
-unpack_integer(Binary, Pos, little) ->
-    <<I:4/integer-signed-little-unit:8>> = binary:part(Binary, Pos, 4),
     {I, Pos+4}.
+%% unpack_integer(Binary, Pos, little) ->
+%%     <<I:4/integer-signed-little-unit:8>> = binary:part(Binary, Pos, 4),
+%%     {I, Pos+4}.
 
 unpack_long(Binary, Pos, Endianness) ->
     {H, PH} = unpack_integer(Binary, Pos, Endianness),
@@ -457,22 +457,13 @@ names(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_TCP) ->
      {?CFG_CONNECTION_GROUP, <<"Group">>},
      {?CFG_CONNECTION_NODE_ID_SERVER, <<"NodeIdServer">>},
      {?CFG_TCP_PROXY, <<"Proxy">>}
-    ];
-names(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_SHM) ->
-    [
-     %%
-     %% @see
-     %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-shm-definition.html
-     %%
-    ];
-names(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_SCI) ->
-    [
-     %%
-     %% @see
-     %%  http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-sci-definition.html
-     %%
-    ];
-names(?CFG_SECTION_CONNECTION, ?CONNECTION_TYPE_OSE) ->
-    [
-     %% ?
     ].
+%%
+%% @see
+%%  CFG_SECTION_CONNECTION, CONNECTION_TYPE_SHM ->
+%%    http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-shm-definition.html
+%%  CFG_SECTION_CONNECTION, CONNECTION_TYPE_SCI ->
+%%    http://dev.mysql.com/doc/refman/5.6/en/mysql-cluster-sci-definition.html
+%%  CFG_SECTION_CONNECTION, CONNECTION_TYPE_OSE ->
+%%    ?
+%%
