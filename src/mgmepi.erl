@@ -79,7 +79,8 @@ checkout(Block, [H|T]) ->
     end.
 
 -spec checkin(mgmepi()) -> ok.
-checkin(#mgmepi{pool=P,worker=W}) ->
+checkin(#mgmepi{pool=P,worker=W})
+  when is_pid(P), is_pid(W) ->
     poolboy:checkin(P, W).
 
 
