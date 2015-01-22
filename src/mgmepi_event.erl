@@ -24,10 +24,12 @@
 
 %% == private ==
 
+%%
 %% @see
 %%  ~/src/mgmapi/ndb_logevent.cpp: ndb_logevent_body
 %%  ~/src/kernel/bloks/dblqh/DblqhMain.cpp: logfileInitCompleteReport/1
 %%  ~/src/kernel/vm/FastScheduler.cpp: reportThreadConfigLoop/6
+%%
 
 %% -- NDB_MGM_EVENT_CATEGORY_STARTUP --
 params(?NDB_LE_NDBStartStarted) -> % INFO,1
@@ -560,32 +562,3 @@ params(?NDB_LE_DropSchemaObject) -> % INFO,8
      {<<"type">>, integer, mandatory},
      {<<"node">>, integer, mandatory}
     ].
-
-%% category(?NDB_MGM_EVENT_CATEGORY_STARTUP - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_STARTUP~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_SHUTDOWN - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_SHUTDOWN~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_STATISTIC - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_STATISTIC~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_CHECKPOINT - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_CHECKPOINT~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_NODE_RESTART - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_NODE_RESTART~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_CONNECTION - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_CONNECTION~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_BACKUP - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_BACKUP~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_CONGESTION - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_CONGESTION~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_DEBUG - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_DEBUG~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_INFO - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_INFO~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_WARNING - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_WARNING~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_ERROR - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_ERROR~n");
-%% category(?NDB_MGM_EVENT_CATEGORY_SCHEMA - ?NDB_MGM_MIN_EVENT_CATEGORY, _, _) ->
-%%     io:format("category: NDB_MGM_EVENT_CATEGORY_SCHEMA~n");
-%% category(N, _, _) ->
-%%     io:format("category: n=~p~n", [N]).

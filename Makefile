@@ -46,7 +46,6 @@ build: get-deps
 	@$(REBAR_ENV) $(REBAR_BIN) $(REBAR_OPT) compile
 
 build_plt:
-#	@$(ERLANG_HOME)/bin/dialyzer --$@ --output_plt $(PLT) -r deps
 	@$(ERLANG_HOME)/bin/dialyzer --$@ --output_plt $(PLT) --apps deps/*/ebin
 
 clean: delete-autosave

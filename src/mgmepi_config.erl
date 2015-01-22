@@ -177,9 +177,6 @@ unpack_binary(Binary, Pos, Endianness) ->
 unpack_integer(Binary, Pos, big) ->
     <<I:4/integer-signed-big-unit:8>> = binary:part(Binary, Pos, 4),
     {I, Pos+4}.
-%% unpack_integer(Binary, Pos, little) ->
-%%     <<I:4/integer-signed-little-unit:8>> = binary:part(Binary, Pos, 4),
-%%     {I, Pos+4}.
 
 unpack_long(Binary, Pos, Endianness) ->
     {H, PH} = unpack_integer(Binary, Pos, Endianness),

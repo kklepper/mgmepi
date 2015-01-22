@@ -108,18 +108,15 @@ alloc_nodeid(#mgmepi{}=R) ->
     alloc_nodeid(R, 0).
 
 -spec alloc_nodeid(mgmepi(),integer()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(#mgmepi{}=R, Node)
-  when (0 =:= Node orelse ?IS_NODE(Node)) ->
+alloc_nodeid(#mgmepi{}=R, Node) ->
     alloc_nodeid(R, Node, <<>>).
 
 -spec alloc_nodeid(mgmepi(),integer(),binary()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(#mgmepi{}=R, Node, Name)
-  when (0 =:= Node orelse ?IS_NODE(Node)), is_binary(Name) ->
+alloc_nodeid(#mgmepi{}=R, Node, Name) ->
     alloc_nodeid(R, Node, Name, true).
 
 -spec alloc_nodeid(mgmepi(),integer(),binary(),boolean()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(#mgmepi{}=R, Node, Name, LogEvent)
-  when (0 =:= Node orelse ?IS_NODE(Node)), is_binary(Name), ?IS_BOOLEAN(LogEvent) ->
+alloc_nodeid(#mgmepi{}=R, Node, Name, LogEvent) ->
     alloc_nodeid(R, Node, Name, LogEvent, ?TIMEOUT).
 
 -spec alloc_nodeid(mgmepi(),integer(),binary(),boolean(),timeout()) -> {ok,integer()}|{error,_}.
@@ -139,8 +136,7 @@ end_session(#mgmepi{worker=W}, Timeout)
 
 
 -spec get_configuration(mgmepi(),integer()) -> {ok,config()}|{error,_}.
-get_configuration(#mgmepi{}=R, Version)
-  when ?IS_VERSION(Version) ->
+get_configuration(#mgmepi{}=R, Version) ->
     get_configuration(R, Version, ?TIMEOUT).
 
 -spec get_configuration(mgmepi(),integer(),timeout()) -> {ok,config()}|{error,_}.
