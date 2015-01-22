@@ -14,6 +14,8 @@
 
 -define(IS_BACKUP_WAIT(T), (is_integer(T) andalso (0 =< T) andalso (2 >= T))).
 
+-define(IS_CONFIG(T), (is_list(T))).
+
 -define(IS_EVENT_CATEGORY(T), (is_integer(T)
                                andalso (?NDB_MGM_MIN_EVENT_CATEGORY =< T)
                                andalso (?NDB_MGM_MAX_EVENT_CATEGORY >= T))).

@@ -183,8 +183,31 @@ end_session_test(_Group, Config) ->
     end.
 
 
-get_configuration_test(Config) -> % TODO
-    {ok, _} = test(get_configuration, [?config(handle,Config),?config(version,Config)]).
+get_configuration_test(Config) ->
+    {ok, L} = test(get_configuration, [?config(handle,Config),?config(version,Config)]),
+    [ E(Config, L) || E <- [
+                            fun get_connection_configuration_test/2,
+                            fun get_node_configuration_test/2,
+                            fun get_system_configuration_test/2
+                           ] ].
+
+get_connection_configuration_test(Config, List) ->
+    F = test(get_connection_configuration, [List,?config(node,Config)]),
+    T = test(get_connection_configuration, [List,?config(node,Config),true]),
+    [ 2 = length(L) - length(R) || {L,R} <- lists:zip(F,T) ]. % TODO
+
+get_node_configuration_test(Config, List) ->
+    [ get_node_configuration_test(Config,List,E) || E <- [1,91,?config(node,Config)] ].
+
+get_node_configuration_test(_Config, List, Node) ->
+    F = test(get_node_configuration, [List,Node]),
+    T = test(get_node_configuration, [List,Node,true]),
+    [ 2 = length(L) - length(R) || {L,R} <- lists:zip(F,T) ]. % TODO
+
+get_system_configuration_test(_Config, List) ->
+    F = test(get_system_configuration, [List]),
+    T = test(get_system_configuration, [List,true]),
+    [ 2 = length(L) - length(R) || {L,R} <- lists:zip(F,T) ]. % TODO
 
 %% == internal ==
 

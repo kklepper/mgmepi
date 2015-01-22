@@ -21,9 +21,7 @@
 
 %% -- private --
 -export([unpack/1, unpack/2, unpack/3]).
--export([get_connection/2, get_connection/3]).
--export([get_node/2, get_node/3]).
--export([get_system/1, get_system/2]).
+-export([get_connection/3, get_node/3, get_system/2]).
 
 %% -- internal --
 
@@ -81,10 +79,6 @@ unpack(Binary, Size, Endianness) -> % 12 =< Size, 0 == Size rem 4
     end.
 
 
--spec get_connection(config(),integer()) -> [config()].
-get_connection(Config, Node) ->
-    get_connection(Config, Node, false).
-
 -spec get_connection(config(),integer(),boolean()) -> [config()].
 get_connection(Config, Node, false) ->
     F = fun (L) ->
@@ -95,11 +89,6 @@ get_connection(Config, Node, false) ->
 get_connection(Config, Node, true) ->
     [ combine(E,?CFG_SECTION_CONNECTION) || E <- get_connection(Config,Node,false) ].
 
-
--spec get_node(config(),integer()) -> [config()].
-get_node(Config, Node) ->
-    get_node(Config, Node, false).
-
 -spec get_node(config(),integer(),boolean()) -> [config()].
 get_node(Config, Node, false) ->
     F = fun (L) ->
@@ -108,11 +97,6 @@ get_node(Config, Node, false) ->
     lists:filter(F, find(Config,[0,?CFG_SECTION_NODE]));
 get_node(Config, Node, true) ->
     [ combine(E,?CFG_SECTION_NODE) || E <- get_node(Config,Node,false) ].
-
-
--spec get_system(config()) -> [config()].
-get_system(Config) ->
-    get_system(Config, false).
 
 -spec get_system(config(),boolean()) -> [config()].
 get_system(Config, false) ->

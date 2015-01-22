@@ -27,7 +27,10 @@
          check_connection/1, check_connection/2]).
 -export([alloc_nodeid/1, alloc_nodeid/2, alloc_nodeid/3, alloc_nodeid/4, alloc_nodeid/5,
          end_session/1, end_session/2]).
--export([get_configuration/2, get_configuration/3]).
+-export([get_configuration/2, get_configuration/3,
+         get_connection_configuration/2, get_connection_configuration/3,
+         get_node_configuration/2, get_node_configuration/3,
+         get_system_configuration/1, get_system_configuration/2]).
 
 %% -- internal --
 -record(mgmepi, {
@@ -143,3 +146,30 @@ get_configuration(#mgmepi{}=R, Version) ->
 get_configuration(#mgmepi{worker=W}, Version, Timeout)
   when is_pid(W), ?IS_VERSION(Version), ?IS_TIMEOUT(Timeout) ->
     mgmepi_protocol:get_configuration(W, Version, Timeout).
+
+-spec get_connection_configuration(config(),integer()) -> [config()].
+get_connection_configuration(Config, Node) ->
+    get_connection_configuration(Config, Node, false).
+
+-spec get_connection_configuration(config(),integer(),boolean()) -> [config()].
+get_connection_configuration(Config, Node, Debug)
+  when ?IS_CONFIG(Config), ?IS_NODE(Node), ?IS_BOOLEAN(Debug) ->
+    mgmepi_config:get_connection(Config, Node, Debug).
+
+-spec get_node_configuration(config(),integer()) -> [config()].
+get_node_configuration(Config, Node) ->
+    get_node_configuration(Config, Node, false).
+
+-spec get_node_configuration(config(),integer(),boolean()) -> [config()].
+get_node_configuration(Config, Node, Debug)
+  when ?IS_CONFIG(Config), ?IS_NODE(Node), ?IS_BOOLEAN(Debug) ->
+    mgmepi_config:get_node(Config, Node, Debug).
+
+-spec get_system_configuration(config()) -> [config()].
+get_system_configuration(Config) ->
+    get_system_configuration(Config, false).
+
+-spec get_system_configuration(config(),boolean()) -> [config()].
+get_system_configuration(Config, Debug)
+  when ?IS_CONFIG(Config), ?IS_BOOLEAN(Debug) ->
+    mgmepi_config:get_system(Config, Debug).
