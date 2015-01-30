@@ -106,7 +106,7 @@ stop_test(_Group, Config) ->
     end.
 
 version_test(_Config) ->
-    [0,1] = test(version, []).
+    [0,2] = test(version, []).
 
 
 checkout_test(_Config) ->
@@ -188,6 +188,7 @@ get_configuration_test(Config) ->
     [ E(Config, L) || E <- [
                             fun get_connection_configuration_test/2,
                             fun get_node_configuration_test/2,
+                            fun get_nodes_configuration_test/2,
                             fun get_system_configuration_test/2
                            ] ].
 
@@ -202,6 +203,15 @@ get_node_configuration_test(Config, List) ->
 get_node_configuration_test(_Config, List, Node) ->
     F = test(get_node_configuration, [List,Node]),
     T = test(get_node_configuration, [List,Node,true]),
+    [ 2 = length(L) - length(R) || {L,R} <- lists:zip(F,T) ]. % TODO
+
+get_nodes_configuration_test(Config, List) ->
+    [ get_nodes_configuration_test(Config,List,E)
+      || E <- [?NDB_MGM_NODE_TYPE_NDB,?NDB_MGM_NODE_TYPE_API,?NDB_MGM_NODE_TYPE_MGM] ].
+
+get_nodes_configuration_test(_Config, List, Type) ->
+    F = test(get_nodes_configuration, [List,Type]),
+    T = test(get_nodes_configuration, [List,Type,true]),
     [ 2 = length(L) - length(R) || {L,R} <- lists:zip(F,T) ]. % TODO
 
 get_system_configuration_test(_Config, List) ->

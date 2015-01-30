@@ -30,6 +30,7 @@
 -export([get_configuration/2, get_configuration/3,
          get_connection_configuration/2, get_connection_configuration/3,
          get_node_configuration/2, get_node_configuration/3,
+         get_nodes_configuration/2, get_nodes_configuration/3,
          get_system_configuration/1, get_system_configuration/2]).
 
 %% -- internal --
@@ -164,6 +165,15 @@ get_node_configuration(Config, Node) ->
 get_node_configuration(Config, Node, Debug)
   when ?IS_CONFIG(Config), ?IS_NODE(Node), ?IS_BOOLEAN(Debug) ->
     mgmepi_config:get_node(Config, Node, Debug).
+
+-spec get_nodes_configuration(config(),integer()) -> [config()].
+get_nodes_configuration(Config, Type) ->
+    get_nodes_configuration(Config, Type, false).
+
+-spec get_nodes_configuration(config(),integer(),boolean()) -> [config()].
+get_nodes_configuration(Config, Type, Debug)
+  when ?IS_CONFIG(Config), ?IS_NODE_TYPE(Type), ?IS_BOOLEAN(Debug) ->
+    mgmepi_config:get_nodes(Config, Type, Debug).
 
 -spec get_system_configuration(config()) -> [config()].
 get_system_configuration(Config) ->

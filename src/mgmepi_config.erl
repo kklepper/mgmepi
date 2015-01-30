@@ -21,7 +21,7 @@
 
 %% -- private --
 -export([unpack/1, unpack/2, unpack/3]).
--export([get_connection/3, get_node/3, get_system/2]).
+-export([get_connection/3, get_node/3, get_nodes/3, get_system/2]).
 
 %% -- internal --
 
@@ -97,6 +97,15 @@ get_node(Config, Node, false) ->
     lists:filter(F, find(Config,[0,?CFG_SECTION_NODE]));
 get_node(Config, Node, true) ->
     [ combine(E,?CFG_SECTION_NODE) || E <- get_node(Config,Node,false) ].
+
+-spec get_nodes(config(),integer(),boolean()) -> [config()].
+get_nodes(Config, Type, false) ->
+    F = fun (L) ->
+                lists:member({?CFG_TYPE_OF_SECTION,Type}, L)
+        end,
+    lists:filter(F, find(Config,[0,?CFG_SECTION_NODE]));
+get_nodes(Config, Type, true) ->
+    [ combine(E,?CFG_SECTION_NODE) || E <- get_nodes(Config,Type,false) ].
 
 -spec get_system(config(),boolean()) -> [config()].
 get_system(Config, false) ->
