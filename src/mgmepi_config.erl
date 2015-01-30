@@ -83,7 +83,7 @@ unpack(Binary, Size, Endianness) -> % 12 =< Size, 0 == Size rem 4
 get_connection(Config, Node, false) ->
     F = fun (L) ->
                 lists:member({?CFG_CONNECTION_NODE_1,Node}, L)
-                    orelse lists:member({?CFG_CONNECTION_NODE_2,Node}, L) % TODO
+                    orelse lists:member({?CFG_CONNECTION_NODE_2,Node}, L)
         end,
     lists:filter(F, find(Config,[0,?CFG_SECTION_CONNECTION]));
 get_connection(Config, Node, true) ->
