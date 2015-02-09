@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 %% -*- erlang -*-
-%%! -pa ebin -config priv/conf/n1 -s mgmepi
+%%! -pa ebin -config priv/conf/n2 -s mgmepi
 
 -include_lib("mgmepi/include/mgmepi.hrl").
 
@@ -8,9 +8,7 @@
 
 run(3, Pid) ->
     L = [
-         {?NDB_MGM_EVENT_CATEGORY_STATISTIC,  15},
-         {?NDB_MGM_EVENT_CATEGORY_CHECKPOINT, 15},
-         {?NDB_MGM_EVENT_CATEGORY_WARNING,    15}
+         {?NDB_MGM_EVENT_CATEGORY_CHECKPOINT, 15}
         ],
     T = infinity,
     case mgmepi_protocol:listen_event(Pid,L,T) of
@@ -63,33 +61,17 @@ run(1, Pid) ->
          {false, fun(E) -> mgmepi_protocol:get_configuration(E,V,T) end},
          {false, fun(E) -> mgmepi_protocol:get_configuration_from_node(E,V,1,T) end},
          {false, fun(E) -> run(2,E) end},
-         {false, fun(E) -> run(3,E) end},
+         {true, fun(E) -> run(3,E) end},
          {false, fun(E) -> mgmepi_protocol:create_nodegroup(E,[2,5],T) end},
          {false, fun(E) -> mgmepi_protocol:drop_nodegroup(E,1,T) end},
          {true,  fun(E) -> mgmepi_protocol:end_session(E,T) end}
         ],
     [ io:format("~p~n", [timer:tc(F,[Pid])]) || {true,F} <- L ];
 run(0, app) ->
-    N = mgmepi_pool,
-    case poolboy:checkout(N) of
-        P when is_pid(P)->
-            run(1, P),
-            poolboy:checkin(N, P)
-    end;
-run(0, server) ->
-    L = [
-         {active, false},
-         {buffer, 100},
-         {keepalive, true},
-         {mode, binary},
-         {packet, raw},
-         {recbuf, 50},
-         {sndbuf, 50}
-        ],
-    case mgmepi_server:start_link(["127.0.0.1",9001,L,3000]) of
+    case mgmepi:checkout() of
         {ok, P} ->
             run(1, P),
-            mgmepi_server:stop(P)
+            mgmepi:checkin(P)
     end.
 
 handle(_, 0) ->
@@ -107,7 +89,6 @@ handle(R, N) ->
 
 main(_) ->
     L = [
-         %%app
-         server
+         app
         ],
     [ run(0, E) || E <- L ].

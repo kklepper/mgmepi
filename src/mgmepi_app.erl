@@ -28,7 +28,7 @@
 start(_StartType, StartArgs) ->
     baseline_sup:start_link({local, mgmepi_sup},
                             {
-                              {simple_one_for_one, 10, timer:seconds(5)},
+                              {one_for_one, 10, timer:seconds(5)},
                               get_childspecs(args(StartArgs))
                             }).
 
@@ -48,28 +48,47 @@ args(Application, List) ->
     baseline_lists:merge(baseline_app:env(Application), List).
 
 get_childspecs(Args) ->
-    [ get_childspec(E,Args) || E <- proplists:get_value(connect,Args) ].
+    L = proplists:get_value(connect, Args),
+    [ get_childspec(E,lists:nth(E,L), Args) || E <- lists:seq(1,length(L)) ]. % TODO
 
-get_childspec({H,P}, Args)
+get_childspec(N, {H,P}, Args)
   when is_list(H), is_integer(P) ->
     {
-      undefined,
+      N,
       {
-        mgmepi_server,
+        baseline_sup,
         start_link,
         [
-         [
-          H,
-          P,
-          proplists:get_value(options, Args),
-          proplists:get_value(timeout, Args)
-         ]
+         {
+           {simple_one_for_one, 10, timer:seconds(5)},
+           [
+            {
+              undefined,
+              {
+                mgmepi_server,
+                start_link,
+                [
+                 [
+                  H,
+                  P,
+                  proplists:get_value(options, Args),
+                  proplists:get_value(timeout, Args)
+                 ]
+                ]
+              },
+              temporary,
+              timer:seconds(5),
+              worker,
+              [gen_server]
+            }
+           ]
+         }
         ]
       },
-      permanent,
+      transient,
       timer:seconds(5),
-      worker,
-      [mgmepi_server]
+      supervisor,
+      []
     };
-get_childspec(H, Args) ->
-    get_childspec({H,1186}, Args).
+get_childspec(N, H, Args) ->
+    get_childspec(N, {H,1186}, Args).
