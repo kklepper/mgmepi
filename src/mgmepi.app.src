@@ -6,7 +6,19 @@
   {registered, [mgmepi_sup]},
   {included_applications, []},
   {applications, [kernel,stdlib]},
-  {mod, {baseline_app, [
-                        %% @see ../priv/conf/*.config
-                       ]}}
+  {mod, {mgmepi_app, [
+                      {connect, [
+                                 "localhost"
+                                ]},
+                      {options, [
+                                 {active, false},
+                                 {buffer, 8000},
+                                 {keepalive, true},
+                                 {mode, binary},
+                                 {packet, raw},
+                                 {recbuf, 70080},
+                                 {sndbuf, 71540}
+                                ]},
+                      {timeout, 3000}
+                     ]}}
  ]}.

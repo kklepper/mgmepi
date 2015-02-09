@@ -11,7 +11,7 @@
 
 %% -- public --
 -export([start_test/2, stop_test/2, version_test/1]).
--export([checkout_test/1, checkout_test/2, checkin_test/2]).
+-export([checkout_test/2, checkin_test/2]).
 
 -export([get_version_test/2, check_connection_test/1]).
 -export([alloc_nodeid_test/1, alloc_nodeid_test/2, end_session_test/2]).
@@ -41,7 +41,6 @@ all() -> [
 groups() -> [
 
              {config_v73, [], [
-                               checkout_test,
                                {group, groups_public}
                               ]},
 
@@ -109,30 +108,25 @@ version_test(_Config) ->
     [0,2] = test(version, []).
 
 
-checkout_test(_Config) ->
-    L = [ test(checkout,[]) || _ <- lists:seq(1,3) ], % << priv/ct/ct.config, size=3
-    {error, full} = test(checkout,[]),
-    [ ok = test(checkin,[E]) || {ok,E} <- L ].
-
 checkout_test(_Group, Config) ->
     case test(checkout, []) of
-        {ok, Handle} ->
-            [{handle,Handle}|Config];
+        {ok, Pid} ->
+            [{pid,Pid}|Config];
         {error, Reason} ->
             {skip, Reason}
     end.
 
 checkin_test(_Group, Config) ->
-    case test(checkin, [?config(handle,Config)]) of
+    case test(checkin, [?config(pid,Config)]) of
         ok ->
-            proplists:delete(handle,Config);
+            proplists:delete(pid,Config);
         {error, Reason} ->
             {fail, Reason}
     end.
 
 
 get_version_test(_Group, Config) ->
-    case test(get_version, [?config(handle,Config)]) of
+    case test(get_version, [?config(pid,Config)]) of
         {ok, Version} when ?NDB_VERSION_ID < Version ->
             {skip, max_version};
         {ok, Version} when ?VERSION(7,3,0) > Version ->
@@ -144,11 +138,11 @@ get_version_test(_Group, Config) ->
     end.
 
 check_connection_test(Config) ->
-    ok = test(check_connection, [?config(handle,Config)]).
+    ok = test(check_connection, [?config(pid,Config)]).
 
 
 alloc_nodeid_test(Config) ->
-    H = ?config(handle,Config),
+    H = ?config(pid,Config),
     N = ?config(node, Config),
     L = [
          {
@@ -167,7 +161,7 @@ alloc_nodeid_test(Config) ->
     [ E = test(alloc_nodeid,A) || {A,E} <- L ].
 
 alloc_nodeid_test(Group, Config) ->
-    case test(alloc_nodeid, [?config(handle,Config),0,atom_to_binary(Group,latin1)]) of
+    case test(alloc_nodeid, [?config(pid,Config),0,atom_to_binary(Group,latin1)]) of
         {ok, Node} ->
             [{node,Node}|Config];
         {error, Reason} ->
@@ -175,7 +169,7 @@ alloc_nodeid_test(Group, Config) ->
     end.
 
 end_session_test(_Group, Config) ->
-    case test(end_session, [?config(handle,Config)]) of
+    case test(end_session, [?config(pid,Config)]) of
         ok ->
             proplists:delete(node,Config);
         {error, Reason} ->
@@ -184,7 +178,7 @@ end_session_test(_Group, Config) ->
 
 
 get_configuration_test(Config) ->
-    {ok, L} = test(get_configuration, [?config(handle,Config),?config(version,Config)]),
+    {ok, L} = test(get_configuration, [?config(pid,Config),?config(version,Config)]),
     [ E(Config, L) || E <- [
                             fun get_connection_configuration_test/2,
                             fun get_node_configuration_test/2,

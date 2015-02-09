@@ -1,6 +1,7 @@
 %% -*- erlang -*-
 {incl_mods, [
              mgmepi,
+             mgmepi_app,
              mgmepi_config,
              mgmepi_event,
              mgmepi_protocol,
