@@ -16,6 +16,7 @@
 -export([get_version_test/2, check_connection_test/1]).
 -export([alloc_nodeid_test/1, alloc_nodeid_test/2, end_session_test/2]).
 -export([get_configuration_test/1]).
+-export([listen_event_test/1]).
 
 %% == callback: ct ==
 
@@ -55,7 +56,8 @@ groups() -> [
                                              get_configuration_test
                                             ]},
              {group_parallel_2, [sequence], [
-                                             check_connection_test
+                                             check_connection_test,
+                                             listen_event_test
                                             ]},
              {group_parallel_3, [sequence], [
                                              check_connection_test,
@@ -110,23 +112,23 @@ version_test(_Config) ->
 
 checkout_test(_Group, Config) ->
     case test(checkout, []) of
-        {ok, Pid} ->
-            [{pid,Pid}|Config];
+        {ok, Handle} ->
+            [{handle,Handle}|Config];
         {error, Reason} ->
             {skip, Reason}
     end.
 
 checkin_test(_Group, Config) ->
-    case test(checkin, [?config(pid,Config)]) of
+    case test(checkin, [?config(handle,Config)]) of
         ok ->
-            proplists:delete(pid,Config);
+            proplists:delete(handle,Config);
         {error, Reason} ->
             {fail, Reason}
     end.
 
 
 get_version_test(_Group, Config) ->
-    case test(get_version, [?config(pid,Config)]) of
+    case test(get_version, [?config(handle,Config)]) of
         {ok, Version} when ?NDB_VERSION_ID < Version ->
             {skip, max_version};
         {ok, Version} when ?VERSION(7,3,0) > Version ->
@@ -138,11 +140,11 @@ get_version_test(_Group, Config) ->
     end.
 
 check_connection_test(Config) ->
-    ok = test(check_connection, [?config(pid,Config)]).
+    ok = test(check_connection, [?config(handle,Config)]).
 
 
 alloc_nodeid_test(Config) ->
-    H = ?config(pid,Config),
+    H = ?config(handle,Config),
     N = ?config(node, Config),
     L = [
          {
@@ -161,7 +163,7 @@ alloc_nodeid_test(Config) ->
     [ E = test(alloc_nodeid,A) || {A,E} <- L ].
 
 alloc_nodeid_test(Group, Config) ->
-    case test(alloc_nodeid, [?config(pid,Config),0,atom_to_binary(Group,latin1)]) of
+    case test(alloc_nodeid, [?config(handle,Config),0,atom_to_binary(Group,latin1)]) of
         {ok, Node} ->
             [{node,Node}|Config];
         {error, Reason} ->
@@ -169,7 +171,7 @@ alloc_nodeid_test(Group, Config) ->
     end.
 
 end_session_test(_Group, Config) ->
-    case test(end_session, [?config(pid,Config)]) of
+    case test(end_session, [?config(handle,Config)]) of
         ok ->
             proplists:delete(node,Config);
         {error, Reason} ->
@@ -178,7 +180,7 @@ end_session_test(_Group, Config) ->
 
 
 get_configuration_test(Config) ->
-    {ok, L} = test(get_configuration, [?config(pid,Config),?config(version,Config)]),
+    {ok, L} = test(get_configuration, [?config(handle,Config),?config(version,Config)]),
     [ E(Config, L) || E <- [
                             fun get_connection_configuration_test/2,
                             fun get_node_configuration_test/2,
@@ -212,6 +214,36 @@ get_system_configuration_test(_Config, List) ->
     F = test(get_system_configuration, [List]),
     T = test(get_system_configuration, [List,true]),
     [ 2 = length(L) - length(R) || {L,R} <- lists:zip(F,T) ]. % TODO
+
+
+listen_event_test(_Config) ->
+    case test(checkout, []) of
+        {ok, Handle} ->
+            L = [
+                 {?NDB_MGM_EVENT_CATEGORY_CHECKPOINT, 15}
+                ],
+            try test(listen_event, [Handle,L]) of
+                {ok, Reference} ->
+                    get_event_test(Reference)
+            after test(checkin, [Handle])
+            end
+    end.
+
+get_event_test(Reference) ->
+    L = [
+         ?NDB_LE_GlobalCheckpointStarted,
+         ?NDB_LE_GlobalCheckpointCompleted
+        ],
+    L = get_event_test(Reference, 2, []).
+
+get_event_test(_Reference, 0, List) ->
+    lists:reverse(List);
+get_event_test(Reference, N, List) ->
+    receive
+        {Reference, Binary} ->
+            L = test(get_event, [Binary]),
+            get_event_test(Reference, N-1, [proplists:get_value(<<"type">>,L)|List])
+    end.
 
 %% == internal ==
 
