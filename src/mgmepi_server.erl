@@ -86,7 +86,9 @@ handle_call({recv,Term,Timeout}, _From, #state{from=undefined}=S) ->
 handle_call({active,Pattern}, From, #state{from=undefined}=S) ->
     ready(Pattern, S#state{from = From});
 handle_call(connect, _From, #state{from=undefined}=S) ->
-    loaded(S).
+    loaded(S);
+handle_call(_Request, _From, State) ->
+    {reply, ignore, State}.
 
 handle_cast(stop, State) ->
     {stop, normal, State}.
