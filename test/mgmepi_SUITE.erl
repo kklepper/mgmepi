@@ -105,7 +105,7 @@ stop_test(_Group, Config) ->
     end.
 
 version_test(_Config) ->
-    [0,2] = test(version, []).
+    [0,3] = test(version, []).
 
 
 checkout_test(_Group, Config) ->
