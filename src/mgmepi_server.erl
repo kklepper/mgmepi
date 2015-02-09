@@ -86,9 +86,7 @@ handle_call({recv,Term,Timeout}, _From, #state{from=undefined}=S) ->
 handle_call({active,Pattern}, From, #state{from=undefined}=S) ->
     ready(Pattern, S#state{from = From});
 handle_call(connect, _From, #state{from=undefined}=S) ->
-    loaded(S);
-handle_call(_Request, _From, State) ->
-    {reply, ignore, State}.
+    loaded(S).
 
 handle_cast(stop, State) ->
     {stop, normal, State}.
@@ -96,8 +94,12 @@ handle_cast(stop, State) ->
 handle_info({tcp,Socket,Data}, #state{handle=H,from=F}=S)
   when Socket =:= ?SOCKET(H), undefined =/= F ->
     listen(Data, S);
-handle_info({'EXIT',_Pid,Reason}, State) ->
-    {stop, Reason, State}.
+handle_info({tcp_closed,Socket}, #state{handle=H}=S)
+  when Socket =:= ?SOCKET(H) ->
+    closed(tcp_closed, S);
+handle_info({'EXIT',Socket,Reason}, #state{handle=H}=S)
+  when Socket =:= ?SOCKET(H) ->
+    closed(Reason, S).
 
 %% == internal ==
 
@@ -154,3 +156,7 @@ listen(Data, #state{module=M,handle=H,from=F,pattern=P,timeout=T}=S) ->
         {error, Reason, Handle} ->
             {stop, {error,Reason}, S#state{handle = Handle}}
     end.
+
+
+closed(Reason, #state{}=S) ->
+    {stop, Reason, S#state{handle = undefined}}.
