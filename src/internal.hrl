@@ -33,3 +33,7 @@
                           andalso (?NDB_MGM_NODE_TYPE_MAX >  T))).
 
 -define(IS_VERSION(T), (is_integer(T))). % > 5.1 (restart:V2)
+
+%% == type ==
+
+-type(proplist() :: proplists:proplist()).

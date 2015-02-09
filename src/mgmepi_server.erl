@@ -31,7 +31,7 @@
 %% -- internal --
 -record(state, {
           module  :: module(),
-          args    :: proplists:proplist(),
+          args    :: proplist(),
           handle  :: tuple(),                   % baseline_socket::handle()
           from    :: {pid(),term()},
           pattern :: binary()|[binary()]|binary:cp(),
@@ -42,7 +42,7 @@
 
 %% == private ==
 
--spec start_link(proplists:proplist()) -> {ok,pid()}|{error,_}.
+-spec start_link(proplist()) -> {ok,pid()}|{error,_}.
 start_link(Args) ->
     case gen_server:start_link(?MODULE, {baseline_socket,Args}, []) of
         {ok, Pid} ->
