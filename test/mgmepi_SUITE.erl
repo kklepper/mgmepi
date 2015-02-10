@@ -17,6 +17,7 @@
 -export([alloc_nodeid_test/1, alloc_nodeid_test/2, end_session_test/2]).
 -export([get_configuration_test/1]).
 -export([listen_event_test/1]).
+-export([exit_socket_test/1]).
 
 %% == callback: ct ==
 
@@ -61,7 +62,8 @@ groups() -> [
                                             ]},
              {group_parallel_3, [sequence], [
                                              check_connection_test,
-                                             alloc_nodeid_test
+                                             alloc_nodeid_test,
+                                             exit_socket_test
                                             ]}
             ].
 
@@ -225,7 +227,9 @@ listen_event_test(_Config) ->
             try test(listen_event, [Handle,L]) of
                 {ok, Reference} ->
                     get_event_test(Reference)
-            after test(checkin, [Handle])
+            after
+                ignore = test(end_session, [Handle]),
+                ok = test(checkin, [Handle]) % = stop
             end
     end.
 
@@ -243,6 +247,26 @@ get_event_test(Reference, N, List) ->
         {Reference, Binary} ->
             L = test(get_event, [Binary]),
             get_event_test(Reference, N-1, [proplists:get_value(<<"type">>,L)|List])
+    end.
+
+
+exit_socket_test(_Config) ->
+    case test(checkout, []) of
+        {ok, Mgmepi} ->
+            %% -- CAUTION --
+            mgmepi = element(1, Mgmepi), 3 = size(Mgmepi),
+            Pid = element(3, Mgmepi),
+            true = is_pid(Pid),
+            State = sys:get_state(Pid),
+            true = (state =:= element(1, State) andalso 7 =:= size(State)),
+            Handle = element(4, State),
+            true = (handle =:= element(1, Handle) andalso 3 =:= size(Handle)),
+            Socket = element(2, Handle),
+            true = is_port(Socket),
+            %% -- CAUTION --
+            true = test(erlang, exit, [Socket,kill]),
+            ok = timer:sleep(500),
+            false = test(erlang, is_process_alive, [Pid])
     end.
 
 %% == internal ==

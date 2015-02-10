@@ -48,13 +48,12 @@ args(Application, List) ->
     baseline_lists:merge(baseline_app:env(Application), List).
 
 get_childspecs(Args) ->
-    L = proplists:get_value(connect, Args),
-    [ get_childspec(E,lists:nth(E,L), Args) || E <- lists:seq(1,length(L)) ]. % TODO
+    [ get_childspec(E,Args) || E <- proplists:get_value(connect,Args) ].
 
-get_childspec(N, {H,P}, Args)
+get_childspec({H,P}, Args)
   when is_list(H), is_integer(P) ->
     {
-      N,
+      {H, P},
       {
         baseline_sup,
         start_link,
@@ -85,10 +84,11 @@ get_childspec(N, {H,P}, Args)
          }
         ]
       },
-      transient,
+      permanent,
       timer:seconds(5),
       supervisor,
       []
     };
-get_childspec(N, H, Args) ->
-    get_childspec(N, {H,1186}, Args).
+get_childspec(H, Args)
+  when is_list(H) ->
+    get_childspec({H,1186}, Args).

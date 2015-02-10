@@ -12,7 +12,7 @@
                                 ]},
                       {options, [
                                  {active, false},
-                                 {buffer, 8000},
+                                 {buffer, 141620},
                                  {keepalive, true},
                                  {mode, binary},
                                  {packet, raw},

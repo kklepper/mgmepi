@@ -66,16 +66,15 @@ version() ->
 
 -spec checkout() -> {ok,mgmepi()}|{error,_}.
 checkout() ->
-    checkout(baseline_sup:children(mgmepi_sup)). % TODO
+    checkout(baseline_sup:children(mgmepi_sup)).
 
 checkout([]) ->
-    {error, full};
+    {error, not_found};
 checkout([H|T]) ->
     case supervisor:start_child(H, []) of
         {ok, Pid} ->
             {ok, #mgmepi{sup = H, worker = Pid}};
-        {error, Reason} ->
-            io:format("WARN: ~p~n", [Reason]),
+        {error, _Reason} ->
             checkout(T)
     end.
 
@@ -86,8 +85,8 @@ checkin(#mgmepi{sup=S,worker=W})
 
 
 -spec get_version(mgmepi()) -> {ok,integer()}|{error,_}.
-get_version(#mgmepi{}=R) ->
-    get_version(R, ?TIMEOUT).
+get_version(Handle) ->
+    get_version(Handle, ?TIMEOUT).
 
 -spec get_version(mgmepi(),timeout()) -> {ok,integer()}|{error,_}.
 get_version(#mgmepi{worker=W}, Timeout)
@@ -95,8 +94,8 @@ get_version(#mgmepi{worker=W}, Timeout)
     mgmepi_protocol:get_version(W, Timeout).
 
 -spec check_connection(mgmepi()) -> ok|{error,_}.
-check_connection(#mgmepi{}=R) ->
-    check_connection(R, ?TIMEOUT).
+check_connection(Handle) ->
+    check_connection(Handle, ?TIMEOUT).
 
 -spec check_connection(mgmepi(),timeout()) -> ok|{error,_}.
 check_connection(#mgmepi{worker=W}, Timeout)
@@ -105,20 +104,20 @@ check_connection(#mgmepi{worker=W}, Timeout)
 
 
 -spec alloc_nodeid(mgmepi()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(#mgmepi{}=R) ->
-    alloc_nodeid(R, 0).
+alloc_nodeid(Handle) ->
+    alloc_nodeid(Handle, 0).
 
 -spec alloc_nodeid(mgmepi(),integer()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(#mgmepi{}=R, Node) ->
-    alloc_nodeid(R, Node, <<>>).
+alloc_nodeid(Handle, Node) ->
+    alloc_nodeid(Handle, Node, <<>>).
 
 -spec alloc_nodeid(mgmepi(),integer(),binary()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(#mgmepi{}=R, Node, Name) ->
-    alloc_nodeid(R, Node, Name, true).
+alloc_nodeid(Handle, Node, Name) ->
+    alloc_nodeid(Handle, Node, Name, true).
 
 -spec alloc_nodeid(mgmepi(),integer(),binary(),boolean()) -> {ok,integer()}|{error,_}.
-alloc_nodeid(#mgmepi{}=R, Node, Name, LogEvent) ->
-    alloc_nodeid(R, Node, Name, LogEvent, ?TIMEOUT).
+alloc_nodeid(Handle, Node, Name, LogEvent) ->
+    alloc_nodeid(Handle, Node, Name, LogEvent, ?TIMEOUT).
 
 -spec alloc_nodeid(mgmepi(),integer(),binary(),boolean(),timeout()) -> {ok,integer()}|{error,_}.
 alloc_nodeid(#mgmepi{worker=W}, Node, Name, LogEvent, Timeout)
@@ -127,8 +126,8 @@ alloc_nodeid(#mgmepi{worker=W}, Node, Name, LogEvent, Timeout)
     mgmepi_protocol:alloc_nodeid(W, Node, Name, LogEvent, Timeout).
 
 -spec end_session(mgmepi()) -> {ok,integer()}|{error,_}.
-end_session(#mgmepi{}=R) ->
-    end_session(R, ?TIMEOUT).
+end_session(Handle) ->
+    end_session(Handle, ?TIMEOUT).
 
 -spec end_session(mgmepi(),timeout()) -> {ok,integer()}|{error,_}.
 end_session(#mgmepi{worker=W}, Timeout)
@@ -137,8 +136,8 @@ end_session(#mgmepi{worker=W}, Timeout)
 
 
 -spec get_configuration(mgmepi(),integer()) -> {ok,config()}|{error,_}.
-get_configuration(#mgmepi{}=R, Version) ->
-    get_configuration(R, Version, ?TIMEOUT).
+get_configuration(Handle, Version) ->
+    get_configuration(Handle, Version, ?TIMEOUT).
 
 -spec get_configuration(mgmepi(),integer(),timeout()) -> {ok,config()}|{error,_}.
 get_configuration(#mgmepi{worker=W}, Version, Timeout)
@@ -183,13 +182,15 @@ get_system_configuration(Config, Debug)
 
 
 -spec listen_event(mgmepi(),[{integer(),integer()}]) -> {ok,reference()}|{error,_}.
-listen_event(#mgmepi{}=R, Filter) ->
-    listen_event(R, Filter, ?TIMEOUT).
+listen_event(Handle, Filter) ->
+    listen_event(Handle, Filter, ?TIMEOUT).
 
 -spec listen_event(mgmepi(),[{integer(),integer()}],timeout()) -> {ok,reference()}|{error,_}.
-listen_event(#mgmepi{worker=W}, Filter, Timeout) ->
+listen_event(#mgmepi{worker=W}, Filter, Timeout)
+  when is_list(Filter), ?IS_TIMEOUT(Timeout) ->
     mgmepi_protocol:listen_event(W, Filter, Timeout).
 
 -spec get_event(binary()) -> [{binary(),term()}].
-get_event(Binary) ->
+get_event(Binary)
+  when is_binary(Binary) ->
     mgmepi_protocol:get_event(Binary).
